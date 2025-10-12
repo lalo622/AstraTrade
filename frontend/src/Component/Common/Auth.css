@@ -1,0 +1,115 @@
+/* Căn giữa form */
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #fff9e6;
+}
+
+/* Thẻ chính */
+.auth-card {
+  background-color: white;
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  width: 350px;
+  text-align: center;
+}
+
+/* Tiêu đề */
+.auth-title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+/* Input */
+.form-group {
+  text-align: left;
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  outline: none;
+}
+
+.form-group input:focus {
+  border-color: #ffcc00;
+  box-shadow: 0 0 4px #ffcc00;
+}
+
+/* Nút */
+.btn-auth {
+  background-color: #ffcc00;
+  color: black;
+  font-weight: bold;
+  border: none;
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.btn-auth:hover {
+  background-color: #f7c600;
+}
+
+/* Footer */
+.auth-footer {
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+.auth-link {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+}
+.alert {
+  margin: 10px 0;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.alert.success {
+  background-color: #e6ffe6;
+  color: #2e7d32;
+}
+
+.alert.error {
+  background-color: #ffe6e6;
+  color: #c62828;
+}
+
+/* Nút gửi lại OTP */
+.btn-resend {
+  margin-top: 12px;
+  background: none;
+  border: none;
+  color: #007bff;
+  cursor: pointer;
+  font-size: 14px;
+  text-decoration: underline;
+}
+
+.btn-resend:disabled {
+  color: gray;
+  cursor: not-allowed;
+  text-decoration: none;
+}
