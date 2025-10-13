@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\ghuol\\OneDrive\\Documents\\DoAnAstra\\backend\\AstraTradeAPI\\AstraTradeAPI.csproj": {}
+    "C:\\Users\\ghuol\\OneDrive\\Documents\\DoAnAstra\\AstraTrade\\backend\\AstraTradeAPI\\AstraTradeAPI.csproj": {}
   },
   "projects": {
-    "C:\\Users\\ghuol\\OneDrive\\Documents\\DoAnAstra\\backend\\AstraTradeAPI\\AstraTradeAPI.csproj": {
+    "C:\\Users\\ghuol\\OneDrive\\Documents\\DoAnAstra\\AstraTrade\\backend\\AstraTradeAPI\\AstraTradeAPI.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\ghuol\\OneDrive\\Documents\\DoAnAstra\\backend\\AstraTradeAPI\\AstraTradeAPI.csproj",
+        "projectUniqueName": "C:\\Users\\ghuol\\OneDrive\\Documents\\DoAnAstra\\AstraTrade\\backend\\AstraTradeAPI\\AstraTradeAPI.csproj",
         "projectName": "AstraTradeAPI",
-        "projectPath": "C:\\Users\\ghuol\\OneDrive\\Documents\\DoAnAstra\\backend\\AstraTradeAPI\\AstraTradeAPI.csproj",
+        "projectPath": "C:\\Users\\ghuol\\OneDrive\\Documents\\DoAnAstra\\AstraTrade\\backend\\AstraTradeAPI\\AstraTradeAPI.csproj",
         "packagesPath": "C:\\Users\\ghuol\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\ghuol\\OneDrive\\Documents\\DoAnAstra\\backend\\AstraTradeAPI\\obj\\",
+        "outputPath": "C:\\Users\\ghuol\\OneDrive\\Documents\\DoAnAstra\\AstraTrade\\backend\\AstraTradeAPI\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
