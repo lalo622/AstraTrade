@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../Context/AuthContext";
-import { authAPI } from "../../Service/AuthApi";
-import "./Auth.css"; 
+import { useAuth } from "../Context/AuthContext";
+import { authAPI } from "../Service/AuthApi";
+import { toast } from "react-toastify";
+import "./Auth.css";
 
-function Login({ switchToRegister }) {  
+function Login({ switchToRegister }) {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
@@ -14,10 +15,12 @@ function Login({ switchToRegister }) {
     e.preventDefault();
     try {
       const response = await authAPI.login({ email, password });
-      login(response.data);
+      login(response);
+      toast.success("🎉 Đăng nhập thành công!");
       navigate("/");
     } catch (error) {
-      alert("Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin!");
+      console.error("Login error:", error.response?.data || error.message);
+      toast.error(error.response?.data?.message || "Đăng nhập thất bại!");
     }
   };
 
@@ -48,9 +51,7 @@ function Login({ switchToRegister }) {
             />
           </div>
 
-          <button type="submit" className="btn-auth">
-            Đăng nhập
-          </button>
+          <button type="submit" className="btn-auth">Đăng nhập</button>
         </form>
 
         <p className="auth-footer">

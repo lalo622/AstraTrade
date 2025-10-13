@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { authAPI } from '../../Service/AuthApi';
+import { useNavigate } from 'react-router-dom';
+import { authAPI } from '../Service/AuthApi';
 import './Auth.css';
 
-const Register = ({ switchToLogin }) => {
+const Register = () => {
+  const navigate = useNavigate(); // ✅ Dùng để chuyển trang
   const [step, setStep] = useState(1); // 1: Nhập thông tin, 2: Nhập OTP
   const [formData, setFormData] = useState({
     email: '',
@@ -52,9 +54,15 @@ const Register = ({ switchToLogin }) => {
     setError('');
     try {
       setLoading(true);
-      const result = await authAPI.verifyOtp(formData.email, formData.password, formData.otp);
+      const result = await authAPI.verifyOtp(
+        formData.email,
+        formData.password,
+        formData.otp,
+        formData.fullName
+        );
       setMessage(result.message || '🎉 Đăng ký thành công!');
-      setTimeout(() => switchToLogin(), 1500);
+      // ✅ Chuyển sang trang đăng nhập sau 1.5s
+      setTimeout(() => navigate('/login'), 1500);
     } catch (err) {
       console.error(err);
       setError('Mã OTP không hợp lệ. Vui lòng thử lại.');
@@ -105,6 +113,17 @@ const Register = ({ switchToLogin }) => {
         {/* Bước 1: Nhập email + mật khẩu */}
         {step === 1 && (
           <form onSubmit={handleRegister}>
+            <div className="form-group">
+              <label>Họ và tên</label>
+              <input
+                type="text"
+                name="fullName"
+                placeholder="Nhập họ và tên của bạn"
+                value={formData.fullName || ""}
+                onChange={handleChange}
+                required
+              />
+            </div>
             <div className="form-group">
               <label>Email</label>
               <input
@@ -177,7 +196,11 @@ const Register = ({ switchToLogin }) => {
           {step === 1 ? (
             <>
               <span>Đã có tài khoản? </span>
-              <a href="#" className="auth-link" onClick={switchToLogin}>
+              <a
+                href="#"
+                className="auth-link"
+                onClick={() => navigate('/login')}
+              >
                 Đăng nhập ngay
               </a>
             </>
