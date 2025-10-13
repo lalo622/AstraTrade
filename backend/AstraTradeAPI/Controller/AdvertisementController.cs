@@ -15,12 +15,14 @@ namespace AstraTradeAPI.Controllers
         {
             _context = context;
         }
+
+        // ✅ THAY ĐỔI: Chỉ lấy tin đã được duyệt (Approved)
         [HttpGet("all")]
         public async Task<IActionResult> GetAllAds()
         {
             var ads = await _context.Advertisements
                 .Include(a => a.Category)
-                .Where(a => a.Status == "Active")
+                .Where(a => a.Status == "Approved")
                 .Select(a => new
                 {
                     a.AdvertisementID,
@@ -44,7 +46,7 @@ namespace AstraTradeAPI.Controllers
             return Ok(categories);
         }
 
-        // ✅ 2. Đăng tin mới
+        // ✅ THAY ĐỔI: Khi đăng tin mới -> Status = "Pending" (Chờ duyệt)
         [HttpPost("post-ad")]
         public async Task<IActionResult> PostAd([FromBody] PostAdRequest req)
         {
@@ -60,16 +62,20 @@ namespace AstraTradeAPI.Controllers
                 Image = req.Image,
                 UserID = req.UserID,
                 CategoryID = req.CategoryID,
-                Status = "Active"
+                Status = "Pending"
             };
 
             _context.Advertisements.Add(ad);
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Đăng tin thành công", adId = ad.AdvertisementID });
+            return Ok(new { 
+                message = "Đăng tin thành công. Tin của bạn đang chờ được duyệt.", 
+                adId = ad.AdvertisementID,
+                status = "Pending"
+            });
         }
 
-        // ✅ 3. Lấy tin theo UserID, có thể lọc theo Status
+        // ✅ THAY ĐỔI: Cập nhật để đếm đúng các trạng thái mới
         [HttpGet("user-ads-byid")]
         public async Task<IActionResult> GetUserAdsById([FromQuery] int userId, [FromQuery] string? status = null)
         {
@@ -90,16 +96,22 @@ namespace AstraTradeAPI.Controllers
                     a.Image,
                     a.Status,
                     a.CategoryID,
+                    a.PostDate,
+                    a.ModerationDate,
+                    a.RejectionReason,
                     CategoryName = a.Category != null ? a.Category.Name : null
                 })
+                .OrderByDescending(a => a.PostDate)
                 .ToListAsync();
 
-            // Đếm số lượng theo trạng thái
+            // ✅ Đếm số lượng theo trạng thái MỚI
             var counts = new
             {
-                Active = allAds.Count(a => a.Status == "Active"),
-                Inactive = allAds.Count(a => a.Status == "Inactive"),
-                Deleted = allAds.Count(a => a.Status == "Deleted")
+                Pending = allAds.Count(a => a.Status == "Pending"),
+                Approved = allAds.Count(a => a.Status == "Approved"),
+                Rejected = allAds.Count(a => a.Status == "Rejected"),
+                Deleted = allAds.Count(a => a.Status == "Deleted"),
+                Total = allAds.Count
             };
 
             // Nếu có status -> lọc danh sách
@@ -114,8 +126,7 @@ namespace AstraTradeAPI.Controllers
             });
         }
 
-
-        // ✅ 4. Lấy chi tiết 1 tin theo ID (phục vụ khi mở trang sửa tin)
+        // ✅ 4. Lấy chi tiết 1 tin theo ID
         [HttpGet("{id}")]
         public async Task<IActionResult> GetAdById(int id)
         {
@@ -125,6 +136,14 @@ namespace AstraTradeAPI.Controllers
 
             if (ad == null) return NotFound(new { message = "Không tìm thấy tin" });
 
+            // ✅ Query tên admin duyệt riêng
+            string? moderatedByUserName = null;
+            if (ad.ModeratedByUserID.HasValue)
+            {
+                var moderatedByUser = await _context.Users.FindAsync(ad.ModeratedByUserID.Value);
+                moderatedByUserName = moderatedByUser?.Username;
+            }
+
             return Ok(new
             {
                 ad.AdvertisementID,
@@ -133,9 +152,15 @@ namespace AstraTradeAPI.Controllers
                 ad.Price,
                 ad.Image,
                 ad.CategoryID,
-                CategoryName = ad.Category?.Name
+                ad.Status,
+                ad.PostDate,
+                ad.ModerationDate,
+                ad.RejectionReason,
+                CategoryName = ad.Category?.Name,
+                ModeratedByUserName = moderatedByUserName
             });
         }
+
         [HttpPost("upload-image")]
         public async Task<IActionResult> UploadImage(IFormFile file)
         {
@@ -232,14 +257,16 @@ namespace AstraTradeAPI.Controllers
             });
         }
 
-        // ✅ 5. Cập nhật tin
-        // Cập nhật tin
+        // ✅ THAY ĐỔI: Khi cập nhật tin -> Status về "Pending" để duyệt lại
         [HttpPost("update-ad/{id}")]
         public async Task<IActionResult> UpdateAd(int id, [FromBody] PostAdRequest req)
         {
             var ad = await _context.Advertisements.FindAsync(id);
             if (ad == null)
                 return NotFound(new { message = "Không tìm thấy tin để cập nhật" });
+
+            // ✅ Kiểm tra nếu tin đang Rejected hoặc Approved, khi sửa sẽ về Pending
+            var needReview = ad.Status == "Approved" || ad.Status == "Rejected";
 
             ad.Title = req.Title ?? ad.Title;
             ad.Description = req.Description ?? ad.Description;
@@ -248,13 +275,25 @@ namespace AstraTradeAPI.Controllers
             ad.CategoryID = req.CategoryID ?? ad.CategoryID;
             ad.Image = req.Image ?? ad.Image;
 
+           
+            if (needReview)
+            {
+                ad.Status = "Pending";
+                ad.ModerationDate = null;
+                ad.ModeratedByUserID = null;
+                ad.RejectionReason = null;
+            }
+
             _context.Advertisements.Update(ad);
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Cập nhật tin thành công" });
+            return Ok(new { 
+                message = needReview 
+                    ? "Cập nhật tin thành công. Tin của bạn đang chờ được duyệt lại." 
+                    : "Cập nhật tin thành công",
+                status = ad.Status
+            });
         }
-
-
 
         // ✅ 6. Xóa tin (xóa mềm)
         [HttpDelete("delete-ad/{id}")]
