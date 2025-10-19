@@ -1,0 +1,9 @@
+D:\Learning\HK6\CNMPNC\LT\AstraTrade\backend\AstraTradeAPI\obj\Debug\net9.0\AstraTradeAPI.csproj.AssemblyReference.cache
+D:\Learning\HK6\CNMPNC\LT\AstraTrade\backend\AstraTradeAPI\obj\Debug\net9.0\rpswa.dswa.cache.json
+D:\Learning\HK6\CNMPNC\LT\AstraTrade\backend\AstraTradeAPI\obj\Debug\net9.0\AstraTradeAPI.GeneratedMSBuildEditorConfig.editorconfig
+D:\Learning\HK6\CNMPNC\LT\AstraTrade\backend\AstraTradeAPI\obj\Debug\net9.0\AstraTradeAPI.AssemblyInfoInputs.cache
+D:\Learning\HK6\CNMPNC\LT\AstraTrade\backend\AstraTradeAPI\obj\Debug\net9.0\AstraTradeAPI.AssemblyInfo.cs
+D:\Learning\HK6\CNMPNC\LT\AstraTrade\backend\AstraTradeAPI\obj\Debug\net9.0\AstraTradeAPI.csproj.CoreCompileInputs.cache
+D:\Learning\HK6\CNMPNC\LT\AstraTrade\backend\AstraTradeAPI\obj\Debug\net9.0\AstraTradeAPI.MvcApplicationPartsAssemblyInfo.cs
+D:\Learning\HK6\CNMPNC\LT\AstraTrade\backend\AstraTradeAPI\obj\Debug\net9.0\AstraTradeAPI.MvcApplicationPartsAssemblyInfo.cache
+D:\Learning\HK6\CNMPNC\LT\AstraTrade\backend\AstraTradeAPI\obj\Debug\net9.0\AstraTradeAPI.sourcelink.json

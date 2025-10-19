@@ -1,3 +1,4 @@
+import 'package:doancnpmnv_flutter/HomeAdsListPage.dart';
 import 'package:doancnpmnv_flutter/ManageAdsPage.dart';
 import 'package:doancnpmnv_flutter/PostAdPage.dart';
 import 'package:doancnpmnv_flutter/admin/AdminAdModerationPage.dart';
@@ -27,7 +28,7 @@ class _HomeState extends State<Home> {
     super.initState();
     checkLogin();
     _pages.addAll([
-      const Center(child: Text('Trang chủ')),
+      const HomeAdsListPage(),
       const ManageAdsPage(),
       const PostAdPage(),
       const Center(child: Text('Chat')),
