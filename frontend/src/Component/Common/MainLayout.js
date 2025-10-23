@@ -2,7 +2,6 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../Context/AuthContext";
 import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 import "../../Pages/HomePage.css";
 
 const MainLayout = ({ children }) => {
@@ -42,7 +41,10 @@ const MainLayout = ({ children }) => {
             </button>
             {user ? (
               <>
-                <span className="action-btn">👤 Hello, {user.username}</span>
+                {/* SỬA DÒNG NÀY - THÊM FALLBACK */}
+                <span className="action-btn">
+                  👤 Hello, {user.username || user.email || 'User'}
+                </span>
                 <button className="action-btn" onClick={logout}>🚪 Đăng xuất</button>
               </>
             ) : (

@@ -1,0 +1,153 @@
+/* --- Container tổng thể --- */
+.post-detail-container {
+  width: 85%;
+  max-width: 1100px;
+  margin: 60px auto;
+  font-family: "Inter", sans-serif;
+  color: #222;
+  background: #fff;
+  border-radius: 18px;
+  border: 1px solid #e5e5e5; /* ✅ Thêm khung viền tổng thể */
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  padding: 45px 55px;
+  transition: all 0.3s ease;
+}
+
+.post-detail-container:hover {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+  border-color: #ff9900; /* ✅ Đổi viền khi hover cho sang hơn */
+}
+
+/* --- Tiêu đề bài đăng --- */
+.post-title {
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 35px;
+  border-left: 6px solid #ff9900;
+  padding-left: 15px;
+  color: #222;
+}
+
+/* --- Bố cục nội dung --- */
+.post-content {
+  display: flex;
+  gap: 40px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+/* --- Hình ảnh sản phẩm --- */
+.post-image {
+  flex: 1 1 420px;
+  text-align: center;
+  background: #fefefe;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #ececec; /* ✅ Thêm viền quanh hình */
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+}
+
+.post-image:hover {
+  border-color: #ffb84d;
+  box-shadow: 0 6px 16px rgba(255, 153, 0, 0.2);
+}
+
+.post-image img {
+  width: 100%;
+  max-width: 450px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+/* --- Khung thông tin sản phẩm --- */
+.post-info {
+  flex: 1 1 350px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: #fcfcfc;
+  padding: 25px 30px;
+  border-radius: 12px;
+  border: 1px solid #ececec; /* ✅ Viền cho khung thông tin */
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+}
+
+/* --- Giá tiền --- */
+.post-price {
+  font-size: 28px;
+  color: #e67e22;
+  font-weight: 700;
+  background: rgba(230, 126, 34, 0.08);
+  padding: 10px 16px;
+  border-radius: 8px;
+  display: inline-block;
+  width: fit-content;
+  border: 1px solid #f6c68a;
+}
+
+/* --- Danh mục --- */
+.post-category {
+  font-size: 16px;
+  color: #333;
+  background: #f7f7f7;
+  border-left: 4px solid #3498db;
+  padding: 8px 12px;
+  border-radius: 6px;
+  display: inline-block;
+  font-weight: 500;
+}
+
+/* --- Mô tả --- */
+.post-description {
+  font-size: 16.5px;
+  line-height: 1.7;
+  color: #444;
+  white-space: pre-line;
+  background: #fafafa;
+  padding: 16px 20px;
+  border-radius: 10px;
+  border: 1px solid #eee;
+}
+
+/* --- Loading --- */
+.loading {
+  text-align: center;
+  margin-top: 120px;
+  font-size: 20px;
+  color: #777;
+  animation: fade 1s infinite alternate;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .post-detail-container {
+    padding: 25px;
+  }
+
+  .post-content {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .post-title {
+    font-size: 26px;
+  }
+
+  .post-price {
+    font-size: 22px;
+  }
+
+  .post-description {
+    font-size: 15px;
+  }
+}

@@ -17,25 +17,38 @@ namespace AstraTradeAPI.Controllers
 
         // ✅ Thêm vào yêu thích
         [HttpPost("add")]
-        public async Task<IActionResult> AddFavorite([FromBody] AddFavoriteRequest req)
-        {
-            var exists = await _context.Favorites
-                .AnyAsync(f => f.UserID == req.UserID && f.AdvertisementID == req.AdvertisementID);
+public async Task<IActionResult> AddFavorite([FromBody] AddFavoriteRequest req)
+{
+                if (req == null)
+                    return BadRequest("Invalid request.");
 
-            if (exists)
-                return BadRequest(new { message = "Tin đã có trong danh sách yêu thích" });
+                // Kiểm tra user tồn tại
+                var userExists = await _context.Users.AnyAsync(u => u.UserID == req.UserID);
+                if (!userExists)
+                    return BadRequest("User not found.");
 
-            var fav = new Favorite
-            {
-                UserID = req.UserID,
-                AdvertisementID = req.AdvertisementID
-            };
+                // Kiểm tra tin tồn tại
+                var adExists = await _context.Advertisements.AnyAsync(a => a.AdvertisementID == req.AdvertisementID);
+                if (!adExists)
+                    return BadRequest("Advertisement not found.");
 
-            _context.Favorites.Add(fav);
-            await _context.SaveChangesAsync();
+                var exists = await _context.Favorites
+                    .AnyAsync(f => f.UserID == req.UserID && f.AdvertisementID == req.AdvertisementID);
 
-            return Ok(new { message = "Đã thêm vào yêu thích" });
-        }
+                if (exists)
+                    return BadRequest(new { message = "Tin đã có trong danh sách yêu thích" });
+
+                var fav = new Favorite
+                {
+                    UserID = req.UserID,
+                    AdvertisementID = req.AdvertisementID
+                };
+
+                _context.Favorites.Add(fav);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "Đã thêm vào yêu thích" });
+}
 
         // ✅ Lấy danh sách yêu thích của 1 user
         [HttpGet("user/{userId}")]

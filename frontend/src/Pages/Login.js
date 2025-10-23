@@ -15,6 +15,12 @@ function Login({ switchToRegister }) {
     e.preventDefault();
     try {
       const response = await authAPI.login({ email, password });
+       console.log("📝 User data structure:", {
+      token: response.token,
+      email: response.email,
+      username: response.username, // Kiểm tra xem có trường này không
+      id: response.id
+    });
       login(response);
       toast.success("🎉 Đăng nhập thành công!");
       navigate("/");
@@ -53,7 +59,11 @@ function Login({ switchToRegister }) {
 
           <button type="submit" className="btn-auth">Đăng nhập</button>
         </form>
-
+        <p className="auth-footer">
+          <a href="/forgot-password" className="auth-link">
+            Quên mật khẩu?
+          </a>
+        </p>
         <p className="auth-footer">
           Chưa có tài khoản?{" "}
           <a href="#" className="auth-link" onClick={switchToRegister}>
