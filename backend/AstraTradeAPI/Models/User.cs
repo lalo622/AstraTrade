@@ -28,9 +28,6 @@ namespace AstraTradeAPI.Models
 
         public bool IsVIP { get; set; } = false;
         public bool IsActivated { get; set; } = true;
-        public DateTime? VIPExpiryDate { get; set; } 
-        public string? VIPPackageName { get; set; }
-    
 
         // 🔹 Navigation
         public ICollection<Advertisement>? Advertisements { get; set; }

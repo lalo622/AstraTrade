@@ -10,7 +10,6 @@ namespace AstraTradeAPI.Models
         public decimal? Amount { get; set; }
         public string Method { get; set; } = "Cash";
         public string Status { get; set; } = "Pending";
-         public string? OrderId { get; set; }
 
         public int? UserID { get; set; }
         public User? User { get; set; }

@@ -17,38 +17,25 @@ namespace AstraTradeAPI.Controllers
 
         // ✅ Thêm vào yêu thích
         [HttpPost("add")]
-public async Task<IActionResult> AddFavorite([FromBody] AddFavoriteRequest req)
-{
-                if (req == null)
-                    return BadRequest("Invalid request.");
+        public async Task<IActionResult> AddFavorite([FromBody] AddFavoriteRequest req)
+        {
+            var exists = await _context.Favorites
+                .AnyAsync(f => f.UserID == req.UserID && f.AdvertisementID == req.AdvertisementID);
 
-                // Kiểm tra user tồn tại
-                var userExists = await _context.Users.AnyAsync(u => u.UserID == req.UserID);
-                if (!userExists)
-                    return BadRequest("User not found.");
+            if (exists)
+                return BadRequest(new { message = "Tin đã có trong danh sách yêu thích" });
 
-                // Kiểm tra tin tồn tại
-                var adExists = await _context.Advertisements.AnyAsync(a => a.AdvertisementID == req.AdvertisementID);
-                if (!adExists)
-                    return BadRequest("Advertisement not found.");
+            var fav = new Favorite
+            {
+                UserID = req.UserID,
+                AdvertisementID = req.AdvertisementID
+            };
 
-                var exists = await _context.Favorites
-                    .AnyAsync(f => f.UserID == req.UserID && f.AdvertisementID == req.AdvertisementID);
+            _context.Favorites.Add(fav);
+            await _context.SaveChangesAsync();
 
-                if (exists)
-                    return BadRequest(new { message = "Tin đã có trong danh sách yêu thích" });
-
-                var fav = new Favorite
-                {
-                    UserID = req.UserID,
-                    AdvertisementID = req.AdvertisementID
-                };
-
-                _context.Favorites.Add(fav);
-                await _context.SaveChangesAsync();
-
-                return Ok(new { message = "Đã thêm vào yêu thích" });
-}
+            return Ok(new { message = "Đã thêm vào yêu thích" });
+        }
 
         // ✅ Lấy danh sách yêu thích của 1 user
         [HttpGet("user/{userId}")]
