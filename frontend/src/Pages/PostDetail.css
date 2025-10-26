@@ -1,0 +1,122 @@
+.post-detail-container {
+  max-width: 2000px;
+  margin: 50px auto;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+/* Bố cục chính */
+.post-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+
+/* Ảnh sản phẩm */
+.post-image {
+  flex: 1;
+  min-width: 320px;
+  text-align: center;
+}
+
+.post-image img {
+  width: 100%;
+  max-width: 380px;
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+  transition: transform 0.3s ease;
+}
+
+.post-image img:hover {
+  transform: scale(1.03);
+}
+
+/* Khung thông tin bên phải */
+.post-info {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  background-color: #fafafa;
+  padding: 25px 30px;
+  border-radius: 12px;
+  border-left: 4px solid #ffb300;
+}
+
+/* Tiêu đề */
+.post-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 5px;
+}
+
+/* Giá sản phẩm */
+.post-price {
+  font-size: 26px;
+  font-weight: 700;
+  color: #ff9800;
+  margin: 10px 0;
+}
+
+/* Dòng thông tin nhỏ */
+.post-meta {
+  font-size: 16px;
+  color: #444;
+  line-height: 1.6;
+}
+
+.post-meta strong {
+  color: #111;
+}
+
+/* Khu vực nút */
+.post-actions {
+  margin-top: 25px;
+  display: flex;
+  gap: 12px;
+}
+
+/* Nút chung */
+.contact-btn,
+.favorite-btn {
+  border: none;
+  padding: 12px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 15px;
+  transition: all 0.25s ease;
+}
+
+/* Nút liên hệ */
+.contact-btn {
+  background-color: #ffb300;
+  color: white;
+  box-shadow: 0 3px 8px rgba(255,179,0,0.3);
+}
+
+.contact-btn:hover {
+  background-color: #e6a100;
+  transform: translateY(-2px);
+}
+
+/* Nút yêu thích */
+.favorite-btn {
+  background-color: #fff4f4;
+  color: #ff4d4d;
+  border: 1px solid #ffbcbc;
+}
+
+.favorite-btn:hover {
+  background-color: #ffeaea;
+  transform: translateY(-2px);
+}
