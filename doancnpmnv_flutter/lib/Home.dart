@@ -1,3 +1,4 @@
+import 'package:doancnpmnv_flutter/AccountSettingsPage.dart';
 import 'package:doancnpmnv_flutter/HomeAdsListPage.dart';
 import 'package:doancnpmnv_flutter/ManageAdsPage.dart';
 import 'package:doancnpmnv_flutter/PostAdPage.dart';
@@ -20,6 +21,7 @@ class _HomeState extends State<Home> {
   bool isLoggedIn = false;
   String? email;
   String? role;
+  int? user_id;
 
   final List<Widget> _pages = [];
 
@@ -40,11 +42,13 @@ class _HomeState extends State<Home> {
     final token = await SessionManager.getToken();
     final userEmail = await SessionManager.getUserEmail();
     final userRole = await SessionManager.getUserRole(); // 🔹 lấy role
+    final userid = await SessionManager.getUserId();
 
     setState(() {
       isLoggedIn = token != null;
       email = userEmail;
       role = userRole;
+      user_id = userid;
     });
   }
 
@@ -172,7 +176,24 @@ class _HomeState extends State<Home> {
                 ListTile(
                   leading: const Icon(Icons.settings),
                   title: const Text('Cài đặt tài khoản'),
-                  onTap: () {},
+                  onTap: () {
+                    if (user_id != null && user_id! > 0) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AccountSettingsPage(userId: user_id!),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.'),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                    }
+                  },
+
                 ),
                 const Divider(),
                 ListTile(
