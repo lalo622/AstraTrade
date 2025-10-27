@@ -13,7 +13,6 @@ class _AdminAdModerationPageState extends State<AdminAdModerationPage> {
   List<dynamic> pendingAds = [];
   bool isLoading = false;
 
-  // 👉 Đổi IP này sang IP máy server nếu test bằng điện thoại thật
   static const String baseUrl = 'http://10.0.2.2:5234/api/admin/admoderation';
 
   @override
@@ -114,6 +113,8 @@ class _AdminAdModerationPageState extends State<AdminAdModerationPage> {
 
   // ✅ Hàm hiển thị ảnh base64 hoặc URL
   Widget _buildImage(dynamic imgData) {
+    const baseUrl = 'http://10.0.2.2:5234'; // Emulator Android
+
     if (imgData == null || imgData.toString().isEmpty) {
       return Image.asset(
         'assets/images/placeholder.jpg',
@@ -123,30 +124,34 @@ class _AdminAdModerationPageState extends State<AdminAdModerationPage> {
       );
     }
 
-    if (imgData.toString().startsWith('data:image')) {
-      final base64String = imgData.toString().split(',')[1];
-      return Image.memory(
-        base64Decode(base64String),
-        width: 110,
-        height: 110,
-        fit: BoxFit.cover,
-      );
+    String imageUrl = imgData.toString();
+
+    // Nếu chỉ có đường dẫn /uploads/... thì nối baseUrl
+    if (imageUrl.startsWith('/uploads')) {
+      imageUrl = '$baseUrl$imageUrl';
     }
 
-    if (imgData.toString().startsWith('http')) {
+    if (imageUrl.startsWith('http')) {
       return Image.network(
-        imgData,
+        imageUrl,
         width: 110,
         height: 110,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) =>
-            Image.asset('assets/images/placeholder.jpg', width: 110, height: 110),
+        errorBuilder: (context, error, stackTrace) => Image.asset(
+          'assets/images/placeholder.jpg',
+          width: 110,
+          height: 110,
+        ),
       );
     }
 
-    return Image.asset('assets/images/placeholder.jpg', width: 110, height: 110);
+    return Image.asset(
+      'assets/images/placeholder.jpg',
+      width: 110,
+      height: 110,
+      fit: BoxFit.cover,
+    );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -174,8 +179,12 @@ class _AdminAdModerationPageState extends State<AdminAdModerationPage> {
               ? ad['images'][0]
               : null;
 
+          final id = ad['id'] ?? ad['advertisementID'];
+          final adId = int.tryParse(id?.toString() ?? '');
+
           return Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
             elevation: 3,
             margin: const EdgeInsets.symmetric(vertical: 8),
             child: InkWell(
@@ -194,7 +203,8 @@ class _AdminAdModerationPageState extends State<AdminAdModerationPage> {
                               style: const TextStyle(fontSize: 15)),
                           const SizedBox(height: 10),
                           Text("Giá: ${ad['price'] ?? '0'} VNĐ",
-                              style: const TextStyle(fontWeight: FontWeight.bold)),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold)),
                           Text("Người đăng: ${ad['postedBy'] ?? 'Không rõ'}"),
                           Text("Ngày đăng: ${ad['createdDate'] ?? ''}"),
                         ],
@@ -229,7 +239,8 @@ class _AdminAdModerationPageState extends State<AdminAdModerationPage> {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 16)),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16)),
                           const SizedBox(height: 6),
                           Text(ad['description'] ?? 'Không có mô tả',
                               maxLines: 2,
@@ -251,7 +262,9 @@ class _AdminAdModerationPageState extends State<AdminAdModerationPage> {
                                   backgroundColor: Colors.green,
                                   minimumSize: const Size(90, 36),
                                 ),
-                                onPressed: () => approveAd(ad['id']),
+                                onPressed: adId == null
+                                    ? null
+                                    : () => approveAd(adId),
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton.icon(
@@ -261,7 +274,9 @@ class _AdminAdModerationPageState extends State<AdminAdModerationPage> {
                                   backgroundColor: Colors.red,
                                   minimumSize: const Size(90, 36),
                                 ),
-                                onPressed: () => rejectAd(ad['id']),
+                                onPressed: adId == null
+                                    ? null
+                                    : () => rejectAd(adId),
                               ),
                             ],
                           ),
