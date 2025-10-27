@@ -1,4 +1,5 @@
 import 'package:doancnpmnv_flutter/AccountSettingsPage.dart';
+import 'package:doancnpmnv_flutter/FavoritePage.dart';
 import 'package:doancnpmnv_flutter/HomeAdsListPage.dart';
 import 'package:doancnpmnv_flutter/ManageAdsPage.dart';
 import 'package:doancnpmnv_flutter/PostAdPage.dart';
@@ -238,9 +239,21 @@ class _HomeState extends State<Home> {
             icon: const Icon(Icons.favorite_border),
             color: Colors.black,
             onPressed: () {
-              print("Nhấn nút yêu thích!");
+              if (user_id != null && user_id! > 0) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => FavoritePage(userId: user_id!),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Vui lòng đăng nhập để xem yêu thích")),
+                );
+              }
             },
           ),
+
           IconButton(
             icon: const Icon(Icons.notifications_none),
             color: Colors.black,
