@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AstraTradeAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6831ab7cb2af5199d7a093c9d7c7acb85f9da5d8")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8324903b34e4185015bd01d0d344704f34a4665b")]
 [assembly: System.Reflection.AssemblyProductAttribute("AstraTradeAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AstraTradeAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
