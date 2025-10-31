@@ -4,6 +4,7 @@ import 'package:doancnpmnv_flutter/HomeAdsListPage.dart';
 import 'package:doancnpmnv_flutter/ManageAdsPage.dart';
 import 'package:doancnpmnv_flutter/PostAdPage.dart';
 import 'package:doancnpmnv_flutter/admin/AdminAdModerationPage.dart';
+import 'package:doancnpmnv_flutter/admin/AdminPackagePage.dart';
 import 'package:flutter/material.dart';
 import 'package:doancnpmnv_flutter/LoginPage.dart';
 import 'package:doancnpmnv_flutter/RegisterPage.dart';
@@ -150,6 +151,18 @@ class _HomeState extends State<Home> {
                 // 🔹 Nếu là admin -> hiện thêm chức năng
                 if (role?.toLowerCase() == 'admin') ...[
                   const Divider(),
+                  Text("Admin", style: TextStyle(fontWeight: FontWeight.bold),),
+                  ListTile(
+                    leading: const Icon(Icons.shopping_bag_outlined, color: Colors.blue),
+                    title: const Text('Quản lý Package'),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AdminPackagePage()),
+                      );
+                    },
+                  ),
+
                   ListTile(
                     leading: const Icon(Icons.category, color: Colors.blue),
                     title: const Text('Quản lý Category'),
@@ -160,7 +173,6 @@ class _HomeState extends State<Home> {
                       );
                     },
                   ),
-                  const Divider(),
                   ListTile(
                     leading: const Icon(Icons.check, color: Colors.blue),
                     title: const Text('Duyệt tin'),
@@ -174,6 +186,7 @@ class _HomeState extends State<Home> {
                 ],
 
                 const Divider(),
+                Text("Cài đặt", style: TextStyle(fontWeight: FontWeight.bold)),
                 ListTile(
                   leading: const Icon(Icons.settings),
                   title: const Text('Cài đặt tài khoản'),
@@ -228,7 +241,7 @@ class _HomeState extends State<Home> {
       appBar: _selectedIndex == 4
           ? null
           : AppBar(
-        backgroundColor: Colors.yellow[300],
+        backgroundColor: Colors.yellow,
         leading: IconButton(
           color: Colors.black,
           onPressed: () {},

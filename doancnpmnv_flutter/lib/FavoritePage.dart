@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:doancnpmnv_flutter/AdDetailPage.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -61,8 +62,6 @@ class _FavoritePageState extends State<FavoritePage> {
             "http://10.0.2.2:5234/api/favorite/remove?userId=${widget.userId}&adId=$adId"),
       );
 
-      print("Xoá yêu thích: ${response.statusCode} - ${response.body}");
-
       if (response.statusCode == 200) {
         setState(() {
           favoriteAds.removeWhere((ad) => ad["advertisementID"] == adId);
@@ -103,9 +102,16 @@ class _FavoritePageState extends State<FavoritePage> {
       )
           : RefreshIndicator(
         onRefresh: fetchFavorites,
-        child: ListView.builder(
+        child: GridView.builder(
           padding: const EdgeInsets.all(12),
           itemCount: favoriteAds.length,
+          gridDelegate:
+          const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2, // ✅ 2 cột
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 0.75, // Tỉ lệ card
+          ),
           itemBuilder: (context, index) {
             final ad = favoriteAds[index];
 
@@ -115,29 +121,38 @@ class _FavoritePageState extends State<FavoritePage> {
                 : "http://10.0.2.2:5234${ad["image"]}")
                 : "https://via.placeholder.com/200";
 
-            return Card(
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-              elevation: 3,
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
+            return InkWell(
+              borderRadius: BorderRadius.circular(15),
+              onTap: () {
+                // 👉 Ví dụ: chuyển đến trang chi tiết bài đăng
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AdDetailPage(ad: ad), // truyền dữ liệu sang
+                  ),
+                );
+              },
+              child: Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                elevation: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Ảnh sản phẩm
                     ClipRRect(
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(15),
-                        bottomLeft: Radius.circular(15),
+                        topRight: Radius.circular(15),
                       ),
                       child: Image.network(
                         imageUrl,
-                        width: 110,
-                        height: 110,
+                        height: 120,
+                        width: double.infinity,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
-                          width: 110,
-                          height: 110,
+                          height: 120,
                           color: Colors.grey[300],
                           child: const Icon(
                             Icons.image_not_supported,
@@ -146,52 +161,53 @@ class _FavoritePageState extends State<FavoritePage> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 8),
-                        child: Column(
-                          crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              ad["title"] ?? "Không có tiêu đề",
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
+
+                    // Thông tin
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            ad["title"] ?? "Không có tiêu đề",
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              "${ad["price"]?.toString() ?? "0"} VNĐ",
-                              style: const TextStyle(
-                                color: Colors.pink,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "${ad["price"]?.toString() ?? "0"} VNĐ",
+                            style: const TextStyle(
+                              color: Colors.pink,
+                              fontWeight: FontWeight.bold,
                             ),
-                            const SizedBox(height: 6),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: IconButton(
-                                icon: const Icon(
-                                  Icons.favorite,
-                                  color: Colors.redAccent,
-                                ),
-                                onPressed: () => removeFavorite(
-                                    ad["advertisementID"]),
-                              ),
-                            )
-                          ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const Spacer(),
+
+                    // Nút xoá ❤️
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.favorite,
+                          color: Colors.redAccent,
                         ),
+                        onPressed: () =>
+                            removeFavorite(ad["advertisementID"]),
                       ),
                     ),
                   ],
                 ),
               ),
             );
+
           },
         ),
       ),
