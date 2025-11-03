@@ -1,164 +1,215 @@
-import React, { useState } from 'react';
-import '../Pages/HomePage.css';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { useAuth } from "../Context/AuthContext";
+import FavoriteButton from "../Component/Common/FavoriteButton";
+import { Search } from "lucide-react";
 
 function HomePage() {
-  const [location, setLocation] = useState('Hồ Chí Minh');
+  const [ads, setAds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const categories = [
-    { icon: '🚗', name: 'Xe cộ', count: '50,234' },
-    { icon: '🏠', name: 'Bất động sản', count: '120,456' },
-    { icon: '📱', name: 'Điện thoại', count: '34,567' },
-    { icon: '💻', name: 'Đồ điện tử', count: '45,678' },
-    { icon: '👕', name: 'Thời trang', count: '23,456' },
-    { icon: '💼', name: 'Việc làm', count: '12,345' },
-    { icon: '🛋️', name: 'Đồ gia dụng', count: '18,234' },
-    { icon: '📚', name: 'Giáo dục', count: '8,901' },
-  ];
+  // Lấy danh sách categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await axios.get("http://localhost:5234/api/advertisement/categories");
+        setCategories(res.data);
+      } catch (err) {
+        console.error("Lỗi khi tải danh mục:", err);
+      }
+    };
+    fetchCategories();
+  }, []);
+   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchQuery = urlParams.get('q');
+    const categoryFromUrl = urlParams.get('category');
+    
+    console.log("Search params from URL:", { searchQuery, categoryFromUrl });
+    
+    // Load ads với filter từ URL
+    fetchAds(1, categoryFromUrl || null, searchQuery || '');
+  }, [window.location.search]);
 
-  const products = [
-    { id: 1, title: 'iPhone 15 Pro Max 256GB', price: '28,900,000', location: 'Quận 1, TP.HCM', time: '2 giờ trước', image: 'https://placehold.co/300x200/FFB800/333?text=iPhone+15' },
-    { id: 2, title: 'Honda Vision 2024 mới 99%', price: '32,500,000', location: 'Quận 3, TP.HCM', time: '5 giờ trước', image: 'https://placehold.co/300x200/FFA500/333?text=Honda+Vision' },
-    { id: 3, title: 'Cho thuê căn hộ 2PN', price: '12,000,000', location: 'Quận 7, TP.HCM', time: '1 ngày trước', image: 'https://placehold.co/300x200/FFD700/333?text=Căn+hộ' },
-    { id: 4, title: 'MacBook Air M2 2023', price: '24,500,000', location: 'Quận 10, TP.HCM', time: '3 giờ trước', image: 'https://placehold.co/300x200/FFDB58/333?text=MacBook' },
-    { id: 5, title: 'Samsung Galaxy S24 Ultra', price: '26,900,000', location: 'Bình Thạnh, TP.HCM', time: '4 giờ trước', image: 'https://placehold.co/300x200/FFB800/333?text=Samsung' },
-    { id: 6, title: 'Yamaha Exciter 155 VVA', price: '48,500,000', location: 'Tân Bình, TP.HCM', time: '6 giờ trước', image: 'https://placehold.co/300x200/FFA500/333?text=Exciter' },
-    { id: 7, title: 'Áo khoác nam thu đông', price: '450,000', location: 'Quận 1, TP.HCM', time: '1 ngày trước', image: 'https://placehold.co/300x200/FFD700/333?text=Áo+khoác' },
-    { id: 8, title: 'Tủ lạnh Inverter 350L', price: '8,900,000', location: 'Gò Vấp, TP.HCM', time: '2 ngày trước', image: 'https://placehold.co/300x200/FFDB58/333?text=Tủ+lạnh' },
-  ];
+  // Lấy ads với filter
+  const fetchAds = async (page = 1, categoryId = null, searchQuery = '') => {
+    try {
+      setLoading(true);
+      const params = {
+        page,
+        pageSize: 10,
+        vipOnly: page === 1 && !categoryId && !searchQuery // Chỉ VIP khi không search
+      };
+      
+      if (categoryId) {
+        params.categoryId = categoryId;
+      }
+      
+     
+      if (searchQuery) {
+        params.searchQuery = searchQuery;
+      }
+
+      console.log("Calling API with params:", params);
+      
+      const res = await axios.get("http://localhost:5234/api/advertisement/filter", { params });
+
+      const visibleAds = (res.data.ads || []).filter(ad => !ad.isHidden && ad.status === "Approved");
+      setAds(visibleAds);
+      setTotalPages(res.data.totalPages);
+      setCurrentPage(page);
+        } catch (err) {
+          console.error("Lỗi khi tải danh sách tin:", err);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+  // Load ads ban đầu (chỉ VIP)
+  useEffect(() => {
+    fetchAds(1);
+  }, []);
+
+  const handleCategoryChange = (e) => {
+    const categoryId = e.target.value;
+    setSelectedCategory(categoryId);
+    fetchAds(1, categoryId || null);
+  };
+
+  const handleSearch = () => {
+    fetchAds(1, selectedCategory || null);
+  };
+
+  const handlePageChange = (page) => {
+    fetchAds(page, selectedCategory || null);
+  };
+
+  const handlePostAd = () => {
+    if (user) navigate("/postad");
+    else navigate("/login");
+  };
 
   return (
-    <div className="homepage">
-      {/* Header */}
-      <header className="header-new">
-        <div className="header-container">
-          <div className="header-left">
-            <div className="logo-new">AstraTrade</div>
-            <div className="location-picker">
-              <span className="location-icon">📍</span>
-              <span className="location-text">{location}</span>
-              <span className="dropdown-icon">▼</span>
-            </div>
-          </div>
-
-          <div className="search-container">
-            <input
-              type="text"
-              className="search-input-new"
-              placeholder="Tìm kiếm sản phẩm, dịch vụ..."
-            />
-            <button className="search-button-new">🔍</button>
-          </div>
-
-          <div className="header-actions">
-            <button className="action-btn">🔔</button>
-            <button className="action-btn">❤️</button>
-            <button className="action-btn">👤 Tài khoản</button>
-            <button className="post-btn">📷 Đăng tin</button>
-          </div>
-        </div>
-      </header>
-
+    <div className="min-h-screen bg-gray-50">
       {/* Main Content */}
-      <main className="main-content">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Banner */}
-        <div className="banner-new">
-          <div className="banner-text">Mua bán dễ dàng - An toàn tin cậy</div>
+        <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-2xl shadow-lg p-16 mb-10 text-center">
+          <h1 className="text-4xl font-bold text-gray-900">
+            Mua bán dễ dàng - An toàn tin cậy
+          </h1>
         </div>
-
-        {/* Categories */}
-        <section className="categories-section">
-          <div className="section-header">
-            <h2 className="section-title">Danh mục nổi bật</h2>
-            <a href="#" className="view-all">Xem tất cả →</a>
+        {/* Tin đăng Section */}
+        <section>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">
+              {selectedCategory 
+                ? `Tin đăng ${categories.find(c => c.categoryID == selectedCategory)?.name || ''}` 
+                : 'Tin đăng nổi bật'
+              }
+            </h2>
           </div>
-          <div className="categories-grid">
-            {categories.map((cat, idx) => (
-              <div key={idx} className="category-card">
-                <div className="category-icon">{cat.icon}</div>
-                <div className="category-name">{cat.name}</div>
-                <div className="category-count">{cat.count} tin</div>
-              </div>
-            ))}
-          </div>
-        </section>
 
-        {/* Products */}
-        <section className="products-section">
-          <div className="section-header">
-            <h2 className="section-title">Tin đăng mới nhất</h2>
-            <div className="filter-buttons">
-              <button className="filter-btn active">Tất cả</button>
-              <button className="filter-btn">Cá nhân</button>
-              <button className="filter-btn">Bán chuyên</button>
+          {loading ? (
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             </div>
-          </div>
+          ) : ads.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-gray-500 text-lg">Không tìm thấy tin đăng nào.</p>
+            </div>
+          ) : (
+            <>
+              {/* Products Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                {ads.map((ad) => (
+                  <div
+                    key={ad.advertisementID}
+                    onClick={() => navigate(`/post/${ad.advertisementID}`)}
+                    className={`bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer group ${
+                      ad.isUserVip ? 'ring-2 ring-yellow-400 shadow-yellow-100' : ''
+                    }`}
+                  >
+                    {/* Image Container */}
+                    <div className="relative overflow-hidden">
+                      <img
+                        src={ad.image || "https://placehold.co/300x200?text=No+Image"}
+                        alt={ad.title}
+                        className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                      
+                      {/* VIP Badge */}
+                      {ad.isUserVip && (
+                        <div className="absolute top-2 left-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 px-3 py-1 rounded-full text-xs font-bold shadow-lg">
+                          VIP ⭐
+                        </div>
+                      )}
+                      
+                      {/* Favorite Button */}
+                      <div 
+                        className="absolute top-2 right-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <FavoriteButton productId={ad.advertisementID} />
+                      </div>
+                    </div>
 
-          <div className="products-grid">
-            {products.map((product) => (
-              <div key={product.id} className="product-card-new">
-                <div className="product-image-wrapper">
-                  <img src={product.image} alt={product.title} className="product-image" />
-                  <button className="favorite-btn">❤️</button>
-                </div>
-                <div className="product-details">
-                  <h3 className="product-title">{product.title}</h3>
-                  <div className="product-price">{product.price} ₫</div>
-                  <div className="product-location">📍 {product.location}</div>
-                  <div className="product-time">{product.time}</div>
-                </div>
+                    {/* Product Details */}
+                    <div className="p-4">
+                      <h3 className="text-sm font-medium text-gray-900 line-clamp-2 min-h-[40px] mb-2">
+                        {ad.title}
+                      </h3>
+                      
+                      <div className="text-lg font-bold text-yellow-600 mb-2">
+                        {ad.price?.toLocaleString()} ₫
+                      </div>
+                      
+                      <div className="flex items-center text-xs text-gray-500 mb-1">
+                        <span className="mr-1">📦</span>
+                        <span>{ad.categoryName || "Chưa phân loại"}</span>
+                      </div>
+                      
+                      <div className="flex items-center text-xs text-gray-600">
+                        <span className="mr-1">👤</span>
+                        <span>
+                          {ad.userName}
+                          {ad.isUserVip && <span className="text-yellow-500 ml-1">★</span>}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
 
-          <div className="load-more-wrapper">
-            <button className="load-more-btn">Xem thêm tin đăng</button>
-          </div>
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-2 mt-8">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => handlePageChange(page)}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        currentPage === page
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </section>
       </main>
-
-      {/* Footer */}
-      <footer className="footer-new">
-        <div className="footer-container">
-          <div className="footer-grid">
-            <div className="footer-column">
-              <h3 className="footer-title">AstraTrade</h3>
-              <p className="footer-description">
-                Nền tảng mua bán trực tuyến hàng đầu Việt Nam
-              </p>
-            </div>
-            <div className="footer-column">
-              <h4 className="footer-heading">Hỗ trợ khách hàng</h4>
-              <ul className="footer-links">
-                <li><a href="#">Trung tâm trợ giúp</a></li>
-                <li><a href="#">An toàn mua bán</a></li>
-                <li><a href="#">Quy định sử dụng</a></li>
-                <li><a href="#">Quy chế hoạt động</a></li>
-              </ul>
-            </div>
-            <div className="footer-column">
-              <h4 className="footer-heading">Về AstraTrade</h4>
-              <ul className="footer-links">
-                <li><a href="#">Giới thiệu</a></li>
-                <li><a href="#">Tuyển dụng</a></li>
-                <li><a href="#">Truyền thông</a></li>
-                <li><a href="#">Liên hệ</a></li>
-              </ul>
-            </div>
-            <div className="footer-column">
-              <h4 className="footer-heading">Liên kết</h4>
-              <ul className="footer-links">
-                <li><a href="#">Facebook</a></li>
-                <li><a href="#">YouTube</a></li>
-                <li><a href="#">Instagram</a></li>
-                <li><a href="#">Zalo</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="footer-bottom">
-            <p>© 2025 AstraTrade. All rights reserved. Mua bán dễ dàng, an toàn & tin cậy!</p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

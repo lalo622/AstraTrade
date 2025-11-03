@@ -15,12 +15,17 @@ import ForgotPassword from "./Pages/ForgotPassword";
 import PaymentSuccess from './Pages/PaymentSuccess';
 import PaymentFailed from './Pages/PaymentFailed';
 import PaymentHistory from './Pages/PaymentHistory';
+import UserAdsManagement from "./Pages/MyAdvertisement";
+import PackageSelection from "./Pages/PackageSelection";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import "./App.css";
 import PostDetail from "./Pages/PostDetail";
 import AdminVipPackagePage from './Component/Admin/AdminVipPackagePage/AdminVipPackagePage';
+import AdminCategoryList from './Component/Admin/Category/AdminCategoryList';
+import AdminModerationPage from './Component/Admin/AdModeration/AdminModerationPage';
+import AdminLayout from "./Component/Admin/AdminLayout";
 
 function App() {
   return (
@@ -28,8 +33,12 @@ function App() {
       <AuthProvider>
         <div className="App">
           <Routes>
-            {/* Trang có MainLayout */}
+            {/* === TRANG KHÁCH - BỌC TRONG MAINLAYOUT === */}
             <Route path="/" element={<MainLayout><HomePage /></MainLayout>} />
+            <Route path="/favorites" element={<MainLayout><FavoritePage /></MainLayout>} />
+            <Route path="/post/:id" element={<MainLayout><PostDetail /></MainLayout>} />
+            
+            {/* === TRANG CẦN ĐĂNG NHẬP - BỌC TRONG MAINLAYOUT === */}
             <Route 
               path="/postad" 
               element={
@@ -38,35 +47,86 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            <Route path="/favorites" element={<MainLayout><FavoritePage /></MainLayout>} />
-            <Route path="/post/:id" element={<MainLayout><PostDetail /></MainLayout>} />
+            <Route 
+              path="/my-ads" 
+              element={
+                <ProtectedRoute>
+                  <MainLayout><UserAdsManagement /></MainLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/profile" 
+              element={
+                <ProtectedRoute>
+                  <MainLayout><UserProfile /></MainLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/packages" 
+              element={
+                <ProtectedRoute>
+                  <MainLayout><PackageSelection /></MainLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/payment/history" 
+              element={
+                <ProtectedRoute>
+                  <MainLayout><PaymentHistory /></MainLayout>
+                </ProtectedRoute>
+              } 
+            />
 
-           
+            {/* === TRANG ADMIN - BỌC TRONG ADMINLAYOUT === */}
+            {/* AdminPage tổng (có layout bên trong) */}
             <Route path="/admin" element={<AdminPage />} />
-
             
+            {/* Các trang admin riêng lẻ - bọc bằng AdminLayout */}
+            <Route 
+              path="/admin/vip-packages" 
+              element={
+                <ProtectedRoute>
+                  <AdminLayout><AdminVipPackagePage /></AdminLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/categories" 
+              element={
+                <ProtectedRoute>
+                  <AdminLayout><AdminCategoryList /></AdminLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/moderation" 
+              element={
+                <ProtectedRoute>
+                  <AdminLayout><AdminModerationPage /></AdminLayout>
+                </ProtectedRoute>
+              } 
+            />
             <Route path="/auth" element={<Auth />} />
             <Route path="/register" element={<RegisterForm />} />
             <Route path="/login" element={<LoginForm />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/profile" element={<UserProfile />} />
-
             <Route path="/payment/success" element={<PaymentSuccess />} />
             <Route path="/payment/failed" element={<PaymentFailed />} />
-            <Route path="/payment/history" element={<PaymentHistory />} />
-             <Route path="/admin/vip-packages" element={<AdminVipPackagePage />} />
           </Routes>
           <ToastContainer
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          draggable
-          pauseOnHover
-        />
+            position="top-right"
+            autoClose={3000}
+            hideProgressBar={false}
+            newestOnTop
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+          />
         </div>
       </AuthProvider>
     </Router>

@@ -497,3 +497,106 @@ body {
     flex-wrap: wrap;
   }
 }
+/* Search và Filter Section */
+.search-filter-section {
+  padding: 20px 0;
+  background: #f8f9fa;
+}
+
+.search-filter-container {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.category-filter {
+  flex: 1;
+  max-width: 300px;
+}
+
+.category-select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+}
+
+.category-select:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.search-btn {
+  padding: 12px 24px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.search-btn:hover {
+  background: #0056b3;
+}
+
+/* VIP Badge */
+.vip-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: linear-gradient(45deg, #FFD700, #FFA500);
+  color: #000;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  z-index: 2;
+}
+
+.vip-ad {
+  border: 2px solid #FFD700;
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 30px;
+}
+
+.pagination-btn {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pagination-btn:hover {
+  background: #f0f0f0;
+}
+
+.pagination-btn.active {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+/* Product user info */
+.product-user {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}
