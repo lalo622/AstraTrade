@@ -15,12 +15,14 @@ namespace AstraTradeAPI.Controllers
         {
             _context = context;
         }
+
+        // THAY ĐỔI: Chỉ lấy tin đã được duyệt (Approved)
         [HttpGet("all")]
         public async Task<IActionResult> GetAllAds()
         {
             var ads = await _context.Advertisements
                 .Include(a => a.Category)
-                .Where(a => a.Status == "Active")
+                .Where(a => a.Status == "Approved" && !a.IsHidden)
                 .Select(a => new
                 {
                     a.AdvertisementID,
@@ -36,20 +38,47 @@ namespace AstraTradeAPI.Controllers
             return Ok(ads);
         }
 
-        // ✅ 1. Lấy danh sách danh mục
+        // 1. Lấy danh sách danh mục
         [HttpGet("categories")]
         public async Task<IActionResult> GetCategories()
         {
-            var categories = await _context.Categories.ToListAsync();
+            var categories = await _context.Categories
+                .Select(c => new { c.CategoryID, c.Name })
+                .ToListAsync();
             return Ok(categories);
         }
 
-        // ✅ 2. Đăng tin mới
+        // THÊM API ẨN/HIỆN BÀI VIẾT (Toggle IsHidden)
+        [HttpPatch("toggle-visibility/{id}")]
+        public async Task<IActionResult> ToggleVisibility(int id)
+        {
+            var ad = await _context.Advertisements.FindAsync(id);
+            if (ad == null)
+                return NotFound(new { message = "Không tìm thấy tin" });
+
+            ad.IsHidden = !ad.IsHidden;
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = ad.IsHidden ? "Đã ẩn bài viết" : "Đã hiện bài viết",
+                isHidden = ad.IsHidden
+            });
+        }
+
+        // THAY ĐỔI: Khi đăng tin mới -> Status = "Pending" (Chờ duyệt)
         [HttpPost("post-ad")]
         public async Task<IActionResult> PostAd([FromBody] PostAdRequest req)
         {
             if (string.IsNullOrWhiteSpace(req.Title))
                 return BadRequest(new { message = "Tiêu đề không được để trống" });
+
+            if (!req.UserID.HasValue || req.UserID.Value <= 0)
+                return BadRequest(new { message = "UserID không hợp lệ" });
+
+            var userExists = await _context.Users.AnyAsync(u => u.UserID == req.UserID.Value);
+            if (!userExists)
+                return BadRequest(new { message = "User không tồn tại" });
 
             var ad = new Advertisement
             {
@@ -58,18 +87,22 @@ namespace AstraTradeAPI.Controllers
                 Price = req.Price,
                 AdType = req.AdType,
                 Image = req.Image,
-                UserID = req.UserID,
+                UserID = req.UserID.Value,
                 CategoryID = req.CategoryID,
-                Status = "Active"
+                Status = "Pending"
             };
 
             _context.Advertisements.Add(ad);
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Đăng tin thành công", adId = ad.AdvertisementID });
+            return Ok(new
+            {
+                message = "Đăng tin thành công. Tin của bạn đang chờ được duyệt.",
+                adId = ad.AdvertisementID,
+                status = "Pending"
+            });
         }
 
-        // ✅ 3. Lấy tin theo UserID, có thể lọc theo Status
         [HttpGet("user-ads-byid")]
         public async Task<IActionResult> GetUserAdsById([FromQuery] int userId, [FromQuery] string? status = null)
         {
@@ -77,7 +110,6 @@ namespace AstraTradeAPI.Controllers
             if (user == null)
                 return NotFound(new { message = "Không tìm thấy người dùng" });
 
-            // Lấy tất cả tin của user
             var allAds = await _context.Advertisements
                 .Include(a => a.Category)
                 .Where(a => a.UserID == userId)
@@ -90,19 +122,24 @@ namespace AstraTradeAPI.Controllers
                     a.Image,
                     a.Status,
                     a.CategoryID,
+                    a.PostDate,
+                    a.ModerationDate,
+                    a.RejectionReason,
                     CategoryName = a.Category != null ? a.Category.Name : null
                 })
+                .OrderByDescending(a => a.PostDate)
                 .ToListAsync();
 
-            // Đếm số lượng theo trạng thái
+            // Đếm số lượng 
             var counts = new
             {
-                Active = allAds.Count(a => a.Status == "Active"),
-                Inactive = allAds.Count(a => a.Status == "Inactive"),
-                Deleted = allAds.Count(a => a.Status == "Deleted")
+                Pending = allAds.Count(a => a.Status == "Pending"),
+                Approved = allAds.Count(a => a.Status == "Approved"),
+                Rejected = allAds.Count(a => a.Status == "Rejected"),
+                Deleted = allAds.Count(a => a.Status == "Deleted"),
+                Total = allAds.Count
             };
 
-            // Nếu có status -> lọc danh sách
             var filteredAds = !string.IsNullOrEmpty(status)
                 ? allAds.Where(a => a.Status == status).ToList()
                 : allAds;
@@ -114,8 +151,7 @@ namespace AstraTradeAPI.Controllers
             });
         }
 
-
-        // ✅ 4. Lấy chi tiết 1 tin theo ID (phục vụ khi mở trang sửa tin)
+        // 4. Lấy chi tiết 1 tin theo ID
         [HttpGet("{id}")]
         public async Task<IActionResult> GetAdById(int id)
         {
@@ -125,6 +161,14 @@ namespace AstraTradeAPI.Controllers
 
             if (ad == null) return NotFound(new { message = "Không tìm thấy tin" });
 
+            // Query tên admin duyệt riêng
+            string? moderatedByUserName = null;
+            if (ad.ModeratedByUserID.HasValue)
+            {
+                var moderatedByUser = await _context.Users.FindAsync(ad.ModeratedByUserID.Value);
+                moderatedByUserName = moderatedByUser?.Username;
+            }
+
             return Ok(new
             {
                 ad.AdvertisementID,
@@ -133,47 +177,48 @@ namespace AstraTradeAPI.Controllers
                 ad.Price,
                 ad.Image,
                 ad.CategoryID,
-                CategoryName = ad.Category?.Name
+                ad.Status,
+                ad.PostDate,
+                ad.ModerationDate,
+                ad.RejectionReason,
+                CategoryName = ad.Category?.Name,
+                ModeratedByUserName = moderatedByUserName
             });
         }
+
         [HttpPost("upload-image")]
         public async Task<IActionResult> UploadImage(IFormFile file)
         {
             if (file == null || file.Length == 0)
                 return BadRequest(new { message = "Không có file được chọn" });
 
-            // Kiểm tra định dạng file
             var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
             var fileExtension = Path.GetExtension(file.FileName).ToLower();
-            
+
             if (!allowedExtensions.Contains(fileExtension))
                 return BadRequest(new { message = "Chỉ chấp nhận file ảnh (jpg, jpeg, png, gif, webp)" });
 
-            // Kiểm tra kích thước file (tối đa 5MB)
             if (file.Length > 5 * 1024 * 1024)
                 return BadRequest(new { message = "File ảnh không được vượt quá 5MB" });
 
             try
             {
-                // Tạo thư mục uploads nếu chưa tồn tại
                 var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
                 if (!Directory.Exists(uploadsFolder))
                     Directory.CreateDirectory(uploadsFolder);
 
-                // Tạo tên file unique
                 var fileName = Guid.NewGuid().ToString() + fileExtension;
                 var filePath = Path.Combine(uploadsFolder, fileName);
 
-                // Lưu file
                 using (var stream = new FileStream(filePath, FileMode.Create))
                 {
                     await file.CopyToAsync(stream);
                 }
 
-                // Trả về URL để truy cập ảnh
                 var imageUrl = $"/uploads/{fileName}";
-                return Ok(new { 
-                    message = "Upload ảnh thành công", 
+                return Ok(new
+                {
+                    message = "Upload ảnh thành công",
                     imageUrl = imageUrl,
                     fileName = fileName
                 });
@@ -184,7 +229,7 @@ namespace AstraTradeAPI.Controllers
             }
         }
 
-        // ✅ API UPLOAD NHIỀU ẢNH
+        // API UPLOAD NHIỀU ẢNH
         [HttpPost("upload-multiple-images")]
         public async Task<IActionResult> UploadMultipleImages(List<IFormFile> files)
         {
@@ -200,23 +245,19 @@ namespace AstraTradeAPI.Controllers
             {
                 if (file.Length > 0)
                 {
-                    // Kiểm tra định dạng file
                     var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
                     var fileExtension = Path.GetExtension(file.FileName).ToLower();
-                    
+
                     if (!allowedExtensions.Contains(fileExtension))
                         continue;
 
-                    // Tạo thư mục uploads nếu chưa tồn tại
                     var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
                     if (!Directory.Exists(uploadsFolder))
                         Directory.CreateDirectory(uploadsFolder);
 
-                    // Tạo tên file unique
                     var fileName = Guid.NewGuid().ToString() + fileExtension;
                     var filePath = Path.Combine(uploadsFolder, fileName);
 
-                    // Lưu file
                     using (var stream = new FileStream(filePath, FileMode.Create))
                     {
                         await file.CopyToAsync(stream);
@@ -226,20 +267,23 @@ namespace AstraTradeAPI.Controllers
                 }
             }
 
-            return Ok(new { 
+            return Ok(new
+            {
                 message = $"Upload thành công {uploadedUrls.Count} ảnh",
                 imageUrls = uploadedUrls
             });
         }
 
-        // ✅ 5. Cập nhật tin
-        // Cập nhật tin
+        // THAY ĐỔI: Khi cập nhật tin -> Status về "Pending" để duyệt 
         [HttpPost("update-ad/{id}")]
         public async Task<IActionResult> UpdateAd(int id, [FromBody] PostAdRequest req)
         {
             var ad = await _context.Advertisements.FindAsync(id);
             if (ad == null)
                 return NotFound(new { message = "Không tìm thấy tin để cập nhật" });
+
+            // Kiểm tra nếu tin đang Rejected hoặc Approved, khi sửa sẽ về Pending
+            var needReview = ad.Status == "Approved" || ad.Status == "Rejected";
 
             ad.Title = req.Title ?? ad.Title;
             ad.Description = req.Description ?? ad.Description;
@@ -248,15 +292,27 @@ namespace AstraTradeAPI.Controllers
             ad.CategoryID = req.CategoryID ?? ad.CategoryID;
             ad.Image = req.Image ?? ad.Image;
 
+            if (needReview)
+            {
+                ad.Status = "Pending";
+                ad.ModerationDate = null;
+                ad.ModeratedByUserID = null;
+                ad.RejectionReason = null;
+            }
+
             _context.Advertisements.Update(ad);
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Cập nhật tin thành công" });
+            return Ok(new
+            {
+                message = needReview
+                    ? "Cập nhật tin thành công. Tin của bạn đang chờ được duyệt lại."
+                    : "Cập nhật tin thành công",
+                status = ad.Status
+            });
         }
 
-
-
-        // ✅ 6. Xóa tin (xóa mềm)
+        // 6. Xóa tin 
         [HttpDelete("delete-ad/{id}")]
         public async Task<IActionResult> DeleteAd(int id)
         {
@@ -268,6 +324,59 @@ namespace AstraTradeAPI.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Xóa tin thành công" });
+        }
+
+            [HttpGet("filter")]
+        public async Task<IActionResult> FilterAds(
+            int page = 1,
+            int pageSize = 10,
+            int? categoryId = null,
+            string? searchQuery = null,
+            bool vipOnly = false)
+        {
+            var query = _context.Advertisements
+                .Include(a => a.Category)
+                .Include(a => a.User)
+                .Where(a => a.Status == "Approved" && !a.IsHidden)
+                .AsQueryable();
+
+            if (categoryId.HasValue)
+                query = query.Where(a => a.CategoryID == categoryId.Value);
+
+            if (!string.IsNullOrEmpty(searchQuery))
+                query = query.Where(a => a.Title.Contains(searchQuery));
+
+            if (vipOnly)
+                query = query.Where(a => a.User != null && a.User.IsVIP);
+
+            var totalCount = await query.CountAsync();
+
+            var ads = await query
+                .OrderByDescending(a => a.AdvertisementID)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(a => new
+                {
+                    a.AdvertisementID,
+                    a.Title,
+                    a.Price,
+                    a.Image,
+                    a.Description,
+                    a.IsHidden,
+                    a.Status,
+                    a.CategoryID,
+                    CategoryName = a.Category != null ? a.Category.Name : null,
+                    a.UserID,
+                    UserName = a.User != null ? a.User.Username : "Ẩn danh",
+                    IsUserVip = a.User != null && a.User.IsVIP
+                })
+                .ToListAsync();
+
+            return Ok(new
+            {
+                totalPages = (int)Math.Ceiling((double)totalCount / pageSize),
+                ads
+            });
         }
 
         // Request body model
