@@ -1,4 +1,5 @@
 import 'package:doancnpmnv_flutter/AccountSettingsPage.dart';
+import 'package:doancnpmnv_flutter/BuyVIPPage.dart';
 import 'package:doancnpmnv_flutter/FavoritePage.dart';
 import 'package:doancnpmnv_flutter/HomeAdsListPage.dart';
 import 'package:doancnpmnv_flutter/ManageAdsPage.dart';
@@ -25,6 +26,7 @@ class _HomeState extends State<Home> {
   String? role;
   int? user_id;
 
+
   final List<Widget> _pages = [];
 
   @override
@@ -43,7 +45,7 @@ class _HomeState extends State<Home> {
   Future<void> checkLogin() async {
     final token = await SessionManager.getToken();
     final userEmail = await SessionManager.getUserEmail();
-    final userRole = await SessionManager.getUserRole(); // 🔹 lấy role
+    final userRole = await SessionManager.getUserRole();
     final userid = await SessionManager.getUserId();
 
     setState(() {
@@ -184,7 +186,29 @@ class _HomeState extends State<Home> {
                     },
                   ),
                 ],
-
+                const Divider(),
+                Text("VIP", style: TextStyle(fontWeight: FontWeight.bold)),
+                ListTile(
+                  leading: const Icon(Icons.account_balance_wallet),
+                  title: const Text('Mua gói VIP'),
+                  onTap: () {
+                    if (user_id != null && user_id! > 0) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => BuyVIPPage(userId: user_id!),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.'),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                    }
+                  },
+                ),
                 const Divider(),
                 Text("Cài đặt", style: TextStyle(fontWeight: FontWeight.bold)),
                 ListTile(
@@ -207,7 +231,6 @@ class _HomeState extends State<Home> {
                       );
                     }
                   },
-
                 ),
                 const Divider(),
                 ListTile(
