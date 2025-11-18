@@ -30,7 +30,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
   // 🟢 Lấy thông tin user
   Future<void> fetchUserInfo() async {
     try {
-      final url = Uri.parse("http://10.0.2.2:5234/api/auth/profile/${widget.userId}");
+      final url = Uri.parse("http://10.0.2.2:5234/api/auth/user/${widget.userId}");
       final res = await http.get(url);
 
       if (res.statusCode == 200) {
