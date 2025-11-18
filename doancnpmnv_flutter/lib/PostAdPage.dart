@@ -3,279 +3,253 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:doancnpmnv_flutter/Session/sesion_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PostAdPage extends StatefulWidget {
-  const PostAdPage({super.key});
+  final Map<String, dynamic>? adToEdit;
+  const PostAdPage({super.key, this.adToEdit});
 
   @override
   State<PostAdPage> createState() => _PostAdPageState();
 }
 
 class _PostAdPageState extends State<PostAdPage> {
-  final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   final _priceController = TextEditingController();
 
-  int? _selectedCategoryId;
-  String? _selectedAdType = 'Sell';
-  List<dynamic> _categories = [];
-
-  File? _selectedImage;
-  bool _isLoading = false;
-
-  final String baseUrl = "http://10.0.2.2:5234/api/Advertisement"; // ⚙️ Đổi IP khi deploy
+  String? selectedCategory;
+  String adType = "Sell";
+  List<dynamic> categories = [];
+  File? selectedImage;
+  String? uploadedImageUrl;
+  bool isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    fetchCategories();
+    fetchCategories().then((_) {
+      if (widget.adToEdit != null) loadAdToEdit(widget.adToEdit!);
+    });
+  }
+
+  void loadAdToEdit(Map<String, dynamic> ad) {
+    _titleController.text = ad['title'] ?? '';
+    _descController.text = ad['description'] ?? '';
+    _priceController.text = ad['price']?.toString() ?? '';
+    adType = ad['adType'] ?? "Sell";
+    selectedCategory = ad['categoryID']?.toString();
+    uploadedImageUrl = ad['image'];
   }
 
   Future<void> fetchCategories() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/categories'));
+      final response = await http.get(Uri.parse('http://10.0.2.2:5234/api/Advertisement/categories'));
       if (response.statusCode == 200) {
-        setState(() {
-          _categories = jsonDecode(response.body);
-        });
+        final data = jsonDecode(response.body);
+        setState(() => categories = data);
       }
     } catch (e) {
-      debugPrint('Lỗi khi tải danh mục: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Không thể tải danh mục: $e")),
+      );
     }
   }
 
-  Future<void> pickImage() async {
+  Future<void> pickImage(ImageSource source) async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      setState(() {
-        _selectedImage = File(picked.path);
-      });
+    final pickedFile = await picker.pickImage(source: source);
+    if (pickedFile != null) {
+      setState(() => selectedImage = File(pickedFile.path));
+      await uploadImage(selectedImage!);
     }
   }
 
-  Future<String?> uploadImage(File imageFile) async {
+  Future<void> uploadImage(File imageFile) async {
     try {
-      var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/upload-image'));
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('http://10.0.2.2:5234/api/Advertisement/upload-image'),
+      );
       request.files.add(await http.MultipartFile.fromPath('file', imageFile.path));
-      var response = await request.send();
+
+      final response = await request.send();
+      final respStr = await response.stream.bytesToString();
 
       if (response.statusCode == 200) {
-        final respStr = await response.stream.bytesToString();
         final data = jsonDecode(respStr);
-        return data['imageUrl'];
+        setState(() => uploadedImageUrl = data['imageUrl']);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Tải ảnh thành công")),
+        );
       } else {
-        debugPrint('Upload ảnh thất bại: ${response.statusCode}');
-        return null;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Upload thất bại: ${response.statusCode}")),
+        );
       }
     } catch (e) {
-      debugPrint('Lỗi upload ảnh: $e');
-      return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Lỗi upload ảnh: $e")),
+      );
     }
   }
 
   Future<void> postAd() async {
-    if (!_formKey.currentState!.validate()) return;
+    final title = _titleController.text.trim();
+    final desc = _descController.text.trim();
+    final price = double.tryParse(_priceController.text.trim()) ?? 0;
 
-    setState(() => _isLoading = true); // show overlay
-
-    final userId = await SessionManager.getUserId();
-    if (userId == null || userId <= 0) {
+    if (title.isEmpty || selectedCategory == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Vui lòng đăng nhập trước khi đăng tin")),
+        const SnackBar(content: Text("Vui lòng nhập tiêu đề và chọn danh mục")),
       );
-      setState(() => _isLoading = false);
       return;
     }
 
-    String? imageUrl;
-    if (_selectedImage != null) {
-      imageUrl = await uploadImage(_selectedImage!);
-      if (imageUrl == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Không thể upload ảnh")),
-        );
-        setState(() => _isLoading = false);
-        return;
-      }
+    if (uploadedImageUrl == null || uploadedImageUrl!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Vui lòng tải lên ít nhất 1 ảnh")),
+      );
+      return;
     }
 
-    final adData = {
-      "title": _titleController.text.trim(),
-      "description": _descController.text.trim(),
-      "price": double.tryParse(_priceController.text.trim()) ?? 0,
-      "adType": _selectedAdType,
-      "image": imageUrl,
-      "userID": userId,
-      "categoryID": _selectedCategoryId,
-    };
-
+    setState(() => isLoading = true);
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('user_id');
+
+      final body = jsonEncode({
+        "title": title,
+        "description": desc,
+        "price": price,
+        "adType": adType,
+        "categoryID": int.parse(selectedCategory!),
+        "userID": userId,
+        "image": uploadedImageUrl,
+      });
+
+      final url = widget.adToEdit != null
+          ? 'http://10.0.2.2:5234/api/Advertisement/update-ad/${widget.adToEdit!['advertisementID']}'
+          : 'http://10.0.2.2:5234/api/Advertisement/post-ad';
+
       final response = await http.post(
-        Uri.parse('$baseUrl/post-ad'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(adData),
+        Uri.parse(url),
+        headers: {"Content-Type": "application/json"},
+        body: body,
       );
 
+      final data = jsonDecode(response.body);
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(data['message'] ?? "Đăng tin thành công!"),
-            backgroundColor: Colors.green,
-          ),
+          SnackBar(content: Text(data['message'] ?? "Thành công")),
         );
-        Navigator.pop(context);
+        Navigator.pop(context, true);
       } else {
-        final data = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(data['message'] ?? "Đăng tin thất bại"),
-            backgroundColor: Colors.redAccent,
-          ),
+          SnackBar(content: Text(data['message'] ?? "Thất bại")),
         );
       }
     } catch (e) {
-      debugPrint("Lỗi đăng tin: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Lỗi kết nối server")),
+        SnackBar(content: Text("Lỗi kết nối: $e")),
       );
     } finally {
-      setState(() => _isLoading = false);
+      setState(() => isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isEdit = widget.adToEdit != null;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Đăng tin mới", style: TextStyle(color: Colors.black)),
-        backgroundColor: Colors.yellow,
-        iconTheme: const IconThemeData(color: Colors.black),
-      ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text("Tiêu đề", style: TextStyle(fontWeight: FontWeight.bold)),
-                  TextFormField(
-                    controller: _titleController,
-                    decoration: const InputDecoration(hintText: "Nhập tiêu đề tin..."),
-                    validator: (val) => val == null || val.isEmpty ? "Vui lòng nhập tiêu đề" : null,
-                  ),
-                  const SizedBox(height: 15),
-                  const Text("Mô tả", style: TextStyle(fontWeight: FontWeight.bold)),
-                  TextFormField(
-                    controller: _descController,
-                    maxLines: 5,
-                    decoration: const InputDecoration(hintText: "Nhập mô tả chi tiết..."),
-                  ),
-                  const SizedBox(height: 15),
-                  const Text("Giá", style: TextStyle(fontWeight: FontWeight.bold)),
-                  TextFormField(
-                    controller: _priceController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(hintText: "VD: 1500000"),
-                  ),
-                  const SizedBox(height: 15),
-                  const Text("Danh mục", style: TextStyle(fontWeight: FontWeight.bold)),
-                  DropdownButtonFormField<int>(
-                    value: _selectedCategoryId,
-                    items: _categories
-                        .map((c) => DropdownMenuItem<int>(
-                      value: c['categoryID'],
-                      child: Text(c['name']),
-                    ))
-                        .toList(),
-                    onChanged: (val) {
-                      setState(() {
-                        _selectedCategoryId = val;
-                      });
-                    },
-                    decoration: const InputDecoration(hintText: "Chọn danh mục"),
-                    validator: (val) => val == null ? "Vui lòng chọn danh mục" : null,
-                  ),
-                  const SizedBox(height: 15),
-                  const Text("Loại tin", style: TextStyle(fontWeight: FontWeight.bold)),
-                  DropdownButtonFormField<String>(
-                    value: _selectedAdType,
-                    items: const [
-                      DropdownMenuItem(value: 'Sell', child: Text("Bán")),
-                      DropdownMenuItem(value: 'Buy', child: Text("Mua")),
-                      DropdownMenuItem(value: 'Service', child: Text("Dịch vụ")),
-                    ],
-                    onChanged: (val) => setState(() => _selectedAdType = val),
-                  ),
-                  const SizedBox(height: 15),
-                  const Text("Ảnh sản phẩm", style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-                  GestureDetector(
-                    onTap: pickImage,
-                    child: _selectedImage == null
-                        ? Container(
-                      height: 180,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.grey[200],
-                        border: Border.all(color: Colors.grey),
-                      ),
-                      child: const Center(
-                        child: Icon(Icons.add_a_photo_outlined, color: Colors.grey, size: 50),
-                      ),
-                    )
-                        : ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        _selectedImage!,
-                        height: 180,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 25),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.yellow,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      onPressed: _isLoading ? null : postAd,
-                      icon: _isLoading
-                          ? const SizedBox(
-                        height: 16,
-                        width: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                          : const Icon(Icons.send),
-                      label: Text(
-                        _isLoading ? "Đang đăng..." : "Đăng tin",
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+      appBar: AppBar(title: Text(isEdit ? "Sửa tin" : "Đăng tin mới")),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(controller: _titleController, decoration: const InputDecoration(labelText: "Tiêu đề")),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _descController,
+              decoration: const InputDecoration(labelText: "Mô tả"),
+              maxLines: 3,
             ),
-          ),
-          if (_isLoading)
+            const SizedBox(height: 10),
+            TextField(
+              controller: _priceController,
+              decoration: const InputDecoration(labelText: "Giá"),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              value: selectedCategory,
+              hint: const Text("Chọn danh mục"),
+              items: categories.map((c) {
+                return DropdownMenuItem(
+                  value: c['categoryID'].toString(),
+                  child: Text(c['name']),
+                );
+              }).toList(),
+              onChanged: (v) => setState(() => selectedCategory = v),
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              value: adType,
+              items: ["Sell", "Buy", "Rent", "Service"]
+                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                  .toList(),
+              onChanged: (v) => setState(() => adType = v ?? "Sell"),
+              decoration: const InputDecoration(labelText: "Loại tin"),
+            ),
+            const SizedBox(height: 10),
             Container(
-              color: Colors.black45,
-              child: const Center(
-                child: CircularProgressIndicator(),
+              height: 200,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: selectedImage != null
+                  ? Image.file(selectedImage!, fit: BoxFit.cover)
+                  : (uploadedImageUrl != null && uploadedImageUrl!.isNotEmpty)
+                  ? Image.network('http://10.0.2.2:5234$uploadedImageUrl', fit: BoxFit.cover)
+                  : const Center(child: Text("Chưa chọn ảnh")),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () => pickImage(ImageSource.gallery),
+                  icon: const Icon(Icons.photo),
+                  label: const Text("Gallery"),
+                ),
+                const SizedBox(width: 10),
+                ElevatedButton.icon(
+                  onPressed: () => pickImage(ImageSource.camera),
+                  icon: const Icon(Icons.camera_alt),
+                  label: const Text("Camera"),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: isLoading ? null : postAd,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                backgroundColor: Colors.yellow,
+              ),
+              child: isLoading
+                  ? const CircularProgressIndicator(color: Colors.black)
+                  : Text(
+                isEdit ? "Cập nhật tin" : "Đăng tin",
+                style: const TextStyle(color: Colors.black, fontSize: 16),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }

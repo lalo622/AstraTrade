@@ -101,7 +101,7 @@ class _LoginPageState extends State<LoginPage> {
             TextField(
               controller: _emailController,
               decoration: const InputDecoration(
-                labelText: "Email",
+                labelText: "Email hoặc số điện thoại",
                 border: OutlineInputBorder(),
               ),
             ),

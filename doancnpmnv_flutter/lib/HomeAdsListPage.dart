@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:doancnpmnv_flutter/AdDetailPage.dart';
-import 'package:doancnpmnv_flutter/ChatBotPage.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:doancnpmnv_flutter/Session/sesion_manager.dart';
@@ -156,7 +155,6 @@ class _HomeAdsListPageState extends State<HomeAdsListPage> {
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
                             color: Colors.black)),
-
                     const SizedBox(height: 4),
                     const Text("Chợ Tốt muốn là có.",
                         style: TextStyle(color: Colors.black54, fontSize: 15)),
@@ -367,18 +365,6 @@ class _HomeAdsListPageState extends State<HomeAdsListPage> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.yellow,
-        foregroundColor: Colors.black,
-        child: const Icon(Icons.chat),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ChatBotPage()),
-          );
-        },
-      ),
-
     );
   }
 }
