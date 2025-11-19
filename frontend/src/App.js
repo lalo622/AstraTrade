@@ -26,6 +26,8 @@ import AdminVipPackagePage from './Component/Admin/AdminVipPackagePage/AdminVipP
 import AdminCategoryList from './Component/Admin/Category/AdminCategoryList';
 import AdminModerationPage from './Component/Admin/AdModeration/AdminModerationPage';
 import AdminLayout from "./Component/Admin/AdminLayout";
+import ChatPage from "./Pages/ChatPage";
+import AdminReportList from "./Component/Report/AdminReportList";
 
 function App() {
   return (
@@ -78,13 +80,21 @@ function App() {
                   <MainLayout><PaymentHistory /></MainLayout>
                 </ProtectedRoute>
               } 
+              
+            />
+             <Route 
+              path="/chat" 
+              element={
+                <ProtectedRoute>
+                  <MainLayout><ChatPage /></MainLayout>
+                </ProtectedRoute>
+              } 
+              
             />
 
             {/* === TRANG ADMIN - BỌC TRONG ADMINLAYOUT === */}
-            {/* AdminPage tổng (có layout bên trong) */}
             <Route path="/admin" element={<AdminPage />} />
             
-            {/* Các trang admin riêng lẻ - bọc bằng AdminLayout */}
             <Route 
               path="/admin/vip-packages" 
               element={
@@ -106,6 +116,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <AdminLayout><AdminModerationPage /></AdminLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/reports" 
+              element={
+                <ProtectedRoute>
+                  <AdminLayout><AdminReportList /></AdminLayout>
                 </ProtectedRoute>
               } 
             />
