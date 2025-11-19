@@ -14,5 +14,7 @@ namespace AstraTradeAPI.Models
 
         public int? ReceiverID { get; set; }
         public User? Receiver { get; set; }
+        
+        public string? ImageUrl { get; set; }
     }
 }
