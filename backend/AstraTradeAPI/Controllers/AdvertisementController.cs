@@ -156,6 +156,7 @@ namespace AstraTradeAPI.Controllers
         public async Task<IActionResult> GetAdById(int id)
         {
             var ad = await _context.Advertisements
+                .Include(a => a.User)  
                 .Include(a => a.Category)
                 .FirstOrDefaultAsync(a => a.AdvertisementID == id && a.Status != "Deleted");
 
@@ -177,6 +178,7 @@ namespace AstraTradeAPI.Controllers
                 ad.Price,
                 ad.Image,
                 ad.CategoryID,
+                ad.UserID,
                 ad.Status,
                 ad.PostDate,
                 ad.ModerationDate,

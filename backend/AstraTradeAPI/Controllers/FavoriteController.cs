@@ -15,10 +15,21 @@ namespace AstraTradeAPI.Controllers
             _context = context;
         }
 
-        // ✅ Thêm vào yêu thích
+        // Thêm vào yêu thích
         [HttpPost("add")]
         public async Task<IActionResult> AddFavorite([FromBody] AddFavoriteRequest req)
         {
+            if (req == null)
+                return BadRequest("Invalid request.");
+
+            var userExists = await _context.Users.AnyAsync(u => u.UserID == req.UserID);
+            if (!userExists)
+                return BadRequest("User not found.");
+
+            var adExists = await _context.Advertisements.AnyAsync(a => a.AdvertisementID == req.AdvertisementID);
+            if (!adExists)
+                return BadRequest("Advertisement not found.");
+
             var exists = await _context.Favorites
                 .AnyAsync(f => f.UserID == req.UserID && f.AdvertisementID == req.AdvertisementID);
 
@@ -37,7 +48,7 @@ namespace AstraTradeAPI.Controllers
             return Ok(new { message = "Đã thêm vào yêu thích" });
         }
 
-        // ✅ Lấy danh sách yêu thích của 1 user
+        // Lấy danh sách yêu thích của 1 user
         [HttpGet("user/{userId}")]
         public async Task<IActionResult> GetFavoritesByUser(int userId)
         {
@@ -58,14 +69,15 @@ namespace AstraTradeAPI.Controllers
             return Ok(favorites);
         }
 
-        // ✅ Xoá yêu thích
+        // Xoá yêu thích
         [HttpDelete("remove")]
         public async Task<IActionResult> RemoveFavorite([FromQuery] int userId, [FromQuery] int adId)
         {
             var fav = await _context.Favorites
                 .FirstOrDefaultAsync(f => f.UserID == userId && f.AdvertisementID == adId);
 
-            if (fav == null) return NotFound(new { message = "Không tìm thấy yêu thích" });
+            if (fav == null) 
+                return NotFound(new { message = "Không tìm thấy yêu thích" });
 
             _context.Favorites.Remove(fav);
             await _context.SaveChangesAsync();

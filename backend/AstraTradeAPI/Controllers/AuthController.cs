@@ -65,7 +65,7 @@ namespace AstraTradeAPI.Controllers
             if (await _context.Users.AnyAsync(u => u.Email == req.Email))
                 return BadRequest(new { message = "Email này đã được đăng ký." });
 
-            // Tạo tài khoản mới - SỬA PROPERTY NAMES Ở ĐÂY
+            
             var newUser = new User
             {
                 Username = req.Username,
@@ -103,7 +103,7 @@ namespace AstraTradeAPI.Controllers
                 token = tokenString,
                 email = newUser.Email,
                 username = newUser.Username,
-                userId = newUser.UserID // Sửa thành UserID
+                userId = newUser.UserID
             });
         }
 
@@ -114,7 +114,7 @@ namespace AstraTradeAPI.Controllers
             if (user == null)
                 return NotFound(new { message = "Email không tồn tại." });
 
-            if (!BCrypt.Net.BCrypt.Verify(req.Password, user.Password)) // Sửa thành Password
+            if (!BCrypt.Net.BCrypt.Verify(req.Password, user.Password)) 
                 return Unauthorized(new { message = "Sai mật khẩu." });
 
             var key = Encoding.UTF8.GetBytes(_config["Jwt:Key"]);
@@ -136,7 +136,8 @@ namespace AstraTradeAPI.Controllers
                 message = "Đăng nhập thành công",
                 token = tokenString,
                 email = user.Email,
-                userId = user.UserID // Sửa thành UserID
+                userId = user.UserID ,
+                 username = user.Username,
             });
         }
         [HttpPost("forgot-password")]
@@ -155,32 +156,108 @@ namespace AstraTradeAPI.Controllers
             await _emailService.SendEmailAsync(req.Email, "Mã OTP đặt lại mật khẩu", $"Mã OTP của bạn là: <b>{otp}</b>");
             return Ok(new { message = "OTP đặt lại mật khẩu đã được gửi đến email của bạn." });
         }
-            [HttpPost("reset-password")]
-            public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest req)
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest req)
+        {
+            if (!_otpCache.TryGetValue(req.Email, out var otpData))
+                return BadRequest(new { message = "Không tìm thấy OTP. Vui lòng yêu cầu lại." });
+
+            if (otpData.Expiry < DateTime.Now)
             {
-                if (!_otpCache.TryGetValue(req.Email, out var otpData))
-                    return BadRequest(new { message = "Không tìm thấy OTP. Vui lòng yêu cầu lại." });
+                _otpCache.TryRemove(req.Email, out _);
+                return BadRequest(new { message = "OTP đã hết hạn." });
+            }
 
-                if (otpData.Expiry < DateTime.Now)
-                {
-                    _otpCache.TryRemove(req.Email, out _);
-                    return BadRequest(new { message = "OTP đã hết hạn." });
-                }
+            if (otpData.Otp != req.Otp)
+                return BadRequest(new { message = "OTP không hợp lệ." });
 
-                if (otpData.Otp != req.Otp)
-                    return BadRequest(new { message = "OTP không hợp lệ." });
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
+            if (user == null)
+                return NotFound(new { message = "Không tìm thấy người dùng." });
 
-                var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == req.Email);
+            user.Password = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+            await _context.SaveChangesAsync();
+
+            _otpCache.TryRemove(req.Email, out _);
+
+            return Ok(new { message = "Mật khẩu đã được đặt lại thành công." });
+        }
+        [HttpGet("profile/{userId}")]
+
+        public async Task<IActionResult> GetUserProfile(int userId)
+        {
+            try
+            {
+                var user = await _context.Users
+                    .Include(u => u.Payments)
+                    .ThenInclude(p => p.Package)
+                    .Where(u => u.UserID == userId)
+                    .FirstOrDefaultAsync(u => u.UserID == userId);
+                    
+
                 if (user == null)
                     return NotFound(new { message = "Không tìm thấy người dùng." });
+                    var lastPayment = user.Payments?
+                    .Where(p => p.Status == "Success")
+                    .OrderByDescending(p => p.Date)
+                    .FirstOrDefault();
+                DateTime? expiryDate = null;
+                string packageName = null;
 
-                user.Password = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
-                await _context.SaveChangesAsync();
+        if (lastPayment != null && lastPayment.Package != null)
+        {
+            packageName = lastPayment.Package.Name;
+            expiryDate = lastPayment.Date.AddDays(lastPayment.Package.Duration);
 
-                _otpCache.TryRemove(req.Email, out _);
+            // cập nhật trạng thái VIP
+            user.IsVIP = expiryDate > DateTime.Now;
+        }
 
-                return Ok(new { message = "Mật khẩu đã được đặt lại thành công." });
+        return Ok(new
+        {
+            user.UserID,
+            user.Username,
+            user.Email,
+            isVIP = user.IsVIP,
+            vipPackageName = packageName,
+            vipExpiryDate = expiryDate
+        });
+                
             }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi server: " + ex.Message });
+            }
+        }
+        [HttpPost("create-admin")]
+public async Task<IActionResult> CreateAdmin()
+{
+    try
+    {
+        // Kiểm tra xem admin đã tồn tại chưa
+        if (await _context.Users.AnyAsync(u => u.Username == "giatien"))
+        {
+            return BadRequest(new { message = "Admin user already exists" });
+        }
+
+        var adminUser = new User
+        {
+            Username = "giatien",
+            Password = BCrypt.Net.BCrypt.HashPassword("giatien123@"),
+            Email = "giatien@admin.com",
+            Role = "Admin"
+        };
+
+        _context.Users.Add(adminUser);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Admin user created successfully" });
+    }
+    catch (Exception ex)
+    {
+        return StatusCode(500, new { message = $"Internal server error: {ex.Message}" });
+    }
+}
 
 
         // ⚙️ Request models

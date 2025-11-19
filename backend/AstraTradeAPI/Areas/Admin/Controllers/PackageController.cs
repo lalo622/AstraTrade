@@ -46,122 +46,189 @@ namespace AstraTradeAPI.Admin.Controller
         [HttpGet("{id}")]
         public async Task<ActionResult<PackageDto>> GetPackage(int id)
         {
-            var package = await _context.Packages
-                .Where(p => p.PackageID == id)
-                .Select(p => new PackageDto
+            try
+            {
+                var package = await _context.Packages
+                    .Where(p => p.PackageID == id)
+                    .Select(p => new PackageDto
+                    {
+                        PackageID = p.PackageID,
+                        Name = p.Name,
+                        Price = p.Price,
+                        Duration = p.Duration
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (package == null)
                 {
-                    PackageID = p.PackageID,
-                    Name = p.Name,
-                    Price = p.Price,
-                    Duration = p.Duration
-                })
-                .FirstOrDefaultAsync();
+                    return NotFound("Không tìm thấy gói");
+                }
 
-            if (package == null)
-                return NotFound("Không tìm thấy gói");
-
-            return Ok(package);
+                return Ok(package);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi server: {ex.Message}");
+            }
         }
 
         // POST: api/admin/packages
         [HttpPost]
         public async Task<ActionResult<PackageDto>> CreatePackage(CreatePackageDto createPackageDto)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            bool nameExists = await _context.Packages
-                .AnyAsync(p => p.Name.ToLower() == createPackageDto.Name.ToLower());
-
-            if (nameExists)
-                return BadRequest("Tên gói đã tồn tại");
-
-            var package = new Package
+            try
             {
-                Name = createPackageDto.Name,
-                Price = createPackageDto.Price,
-                Duration = createPackageDto.Duration
-            };
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
 
-            _context.Packages.Add(package);
-            await _context.SaveChangesAsync();
+                // Kiểm tra trùng tên
+                bool nameExists = await _context.Packages
+                    .AnyAsync(p => p.Name.ToLower() == createPackageDto.Name.ToLower());
 
-            var result = new PackageDto
+                if (nameExists)
+                {
+                    return BadRequest("Tên gói đã tồn tại");
+                }
+
+                var package = new Package
+                {
+                    Name = createPackageDto.Name,
+                    Price = createPackageDto.Price,
+                    Duration = createPackageDto.Duration
+                };
+
+                _context.Packages.Add(package);
+                await _context.SaveChangesAsync();
+
+                var result = new PackageDto
+                {
+                    PackageID = package.PackageID,
+                    Name = package.Name,
+                    Price = package.Price,
+                    Duration = package.Duration
+                };
+
+                return CreatedAtAction(nameof(GetPackage), new { id = package.PackageID }, result);
+            }
+            catch (Exception ex)
             {
-                PackageID = package.PackageID,
-                Name = package.Name,
-                Price = package.Price,
-                Duration = package.Duration
-            };
-
-            return CreatedAtAction(nameof(GetPackage), new { id = package.PackageID }, result);
+                return StatusCode(500, $"Lỗi server: {ex.Message}");
+            }
         }
 
         // PUT: api/admin/packages/5
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdatePackage(int id, UpdatePackageDto updatePackageDto)
         {
-            if (!ModelState.IsValid)
-                return BadRequest(ModelState);
-
-            var package = await _context.Packages.FindAsync(id);
-            if (package == null)
-                return NotFound("Không tìm thấy gói");
-
-            bool nameExists = await _context.Packages
-                .AnyAsync(p => p.Name.ToLower() == updatePackageDto.Name.ToLower() && p.PackageID != id);
-            if (nameExists)
-                return BadRequest("Tên gói đã tồn tại");
-
-            package.Name = updatePackageDto.Name;
-            package.Price = updatePackageDto.Price;
-            package.Duration = updatePackageDto.Duration;
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new PackageDto
+            try
             {
-                PackageID = package.PackageID,
-                Name = package.Name,
-                Price = package.Price,
-                Duration = package.Duration
-            });
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var package = await _context.Packages.FindAsync(id);
+                if (package == null)
+                {
+                    return NotFound("Không tìm thấy gói");
+                }
+
+                // Kiểm tra trùng tên (trừ package hiện tại)
+                bool nameExists = await _context.Packages
+                    .AnyAsync(p => p.Name.ToLower() == updatePackageDto.Name.ToLower() 
+                                && p.PackageID != id);
+
+                if (nameExists)
+                {
+                    return BadRequest("Tên gói đã tồn tại");
+                }
+
+                package.Name = updatePackageDto.Name;
+                package.Price = updatePackageDto.Price;
+                package.Duration = updatePackageDto.Duration;
+
+                await _context.SaveChangesAsync();
+
+                var result = new PackageDto
+                {
+                    PackageID = package.PackageID,
+                    Name = package.Name,
+                    Price = package.Price,
+                    Duration = package.Duration
+                };
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi server: {ex.Message}");
+            }
         }
 
         // DELETE: api/admin/packages/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeletePackage(int id)
         {
-            var package = await _context.Packages.FindAsync(id);
-            if (package == null)
-                return NotFound("Không tìm thấy gói");
+            try
+            {
+                var package = await _context.Packages
+                    .Include(p => p.Payments) // Include payments để kiểm tra
+                    .FirstOrDefaultAsync(p => p.PackageID == id);
 
-            bool inUse = await _context.Payments.AnyAsync(p => p.PackageID == id);
-            if (inUse)
-                return BadRequest("Không thể xóa gói này vì có người dùng đang sử dụng");
+                if (package == null)
+                {
+                    return NotFound("Không tìm thấy gói");
+                }
 
-            _context.Packages.Remove(package);
-            await _context.SaveChangesAsync();
+                // Kiểm tra xem có người dùng nào đang sử dụng gói này không
+                bool hasActivePayments = await _context.Payments
+                    .AnyAsync(p => p.PackageID == id);
 
-            return NoContent();
+                if (hasActivePayments)
+                {
+                    return BadRequest("Không thể xóa gói này vì có người dùng đang sử dụng");
+                }
+
+                _context.Packages.Remove(package);
+                await _context.SaveChangesAsync();
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi server: {ex.Message}");
+            }
         }
 
         // GET: api/admin/packages/5/check-usage
         [HttpGet("{id}/check-usage")]
         public async Task<ActionResult<object>> CheckPackageUsage(int id)
         {
-            var packageExists = await _context.Packages.AnyAsync(p => p.PackageID == id);
-            if (!packageExists)
-                return NotFound("Không tìm thấy gói");
-
-            var paymentCount = await _context.Payments.CountAsync(p => p.PackageID == id);
-
-            return Ok(new
+            try
             {
-                PackageID = id,
-                IsInUse = paymentCount > 0,
-                UserCount = paymentCount
-            });
+                var packageExists = await _context.Packages.AnyAsync(p => p.PackageID == id);
+                if (!packageExists)
+                {
+                    return NotFound("Không tìm thấy gói");
+                }
+
+                var paymentCount = await _context.Payments
+                    .Where(p => p.PackageID == id)
+                    .CountAsync();
+
+                return Ok(new 
+                { 
+                    PackageID = id,
+                    IsInUse = paymentCount > 0,
+                    UserCount = paymentCount
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Lỗi server: {ex.Message}");
+            }
         }
     }
 }
