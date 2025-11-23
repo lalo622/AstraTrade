@@ -43,10 +43,15 @@ class _LoginPageState extends State<LoginPage> {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['token'] != null) {
-        final token = data['token'];
+        // Đảm bảo token luôn là String (vì đã kiểm tra != null)
+        final token = data['token'] as String;
+
         final userId = data['userId'] ?? 0;
         final userEmail = data['email'] ?? email;
-        final role = data['role'];
+
+        // 🌟 SỬA LỖI: Sử dụng ?? để đảm bảo role luôn là String.
+        // Nếu data['role'] là null, gán mặc định là "Member".
+        final role = data['role'] ?? "Member";
 
         // 🧠 Lưu session
         await SessionManager.saveUser(
@@ -67,12 +72,15 @@ class _LoginPageState extends State<LoginPage> {
               (route) => false,
         );
       } else {
-        final message = data['message'] ?? "❌ Sai thông tin đăng nhập.";
+        // Đảm bảo message luôn là String
+        final message = (data['message'] ?? "❌ Sai thông tin đăng nhập.") as String;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message)),
         );
       }
     } catch (e) {
+      // Bổ sung logging để debug lỗi kết nối chi tiết hơn
+      debugPrint('Login Error: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("🚫 Không thể kết nối tới server: $e")),
       );
