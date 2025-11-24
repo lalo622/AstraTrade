@@ -1,5 +1,6 @@
 import 'package:doancnpmnv_flutter/AccountSettingsPage.dart';
 import 'package:doancnpmnv_flutter/BuyVIPPage.dart';
+import 'package:doancnpmnv_flutter/ConversationsListPage.dart';
 import 'package:doancnpmnv_flutter/FavoritePage.dart';
 import 'package:doancnpmnv_flutter/HomeAdsListPage.dart';
 import 'package:doancnpmnv_flutter/ManageAdsPage.dart';
@@ -33,11 +34,12 @@ class _HomeState extends State<Home> {
   void initState() {
     super.initState();
     checkLogin();
+    // 🌟 Khởi tạo các trang, không dùng logic isLoggedIn ở đây
     _pages.addAll([
       const HomeAdsListPage(),
       const ManageAdsPage(),
       const PostAdPage(),
-      const Center(child: Text('Chat')),
+      const ConversationListPage(), // Đặt ConversationListPage cố định
       _accountPage(),
     ]);
   }
@@ -49,7 +51,7 @@ class _HomeState extends State<Home> {
     final userid = await SessionManager.getUserId();
 
     setState(() {
-      isLoggedIn = token != null;
+      isLoggedIn = token != null && token.isNotEmpty; // 🌟 Thêm kiểm tra token.isNotEmpty
       email = userEmail;
       role = userRole;
       user_id = userid;
@@ -153,7 +155,7 @@ class _HomeState extends State<Home> {
                 // 🔹 Nếu là admin -> hiện thêm chức năng
                 if (role?.toLowerCase() == 'admin') ...[
                   const Divider(),
-                  Text("Admin", style: TextStyle(fontWeight: FontWeight.bold),),
+                  const Text("Admin", style: TextStyle(fontWeight: FontWeight.bold),),
                   ListTile(
                     leading: const Icon(Icons.shopping_bag_outlined, color: Colors.blue),
                     title: const Text('Quản lý Package'),
@@ -187,7 +189,7 @@ class _HomeState extends State<Home> {
                   ),
                 ],
                 const Divider(),
-                Text("VIP", style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text("VIP", style: TextStyle(fontWeight: FontWeight.bold)),
                 ListTile(
                   leading: const Icon(Icons.account_balance_wallet),
                   title: const Text('Mua gói VIP'),
@@ -210,7 +212,7 @@ class _HomeState extends State<Home> {
                   },
                 ),
                 const Divider(),
-                Text("Cài đặt", style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text("Cài đặt", style: TextStyle(fontWeight: FontWeight.bold)),
                 ListTile(
                   leading: const Icon(Icons.settings),
                   title: const Text('Cài đặt tài khoản'),
@@ -245,6 +247,7 @@ class _HomeState extends State<Home> {
                       isLoggedIn = false;
                       email = null;
                       role = null;
+                      user_id = null;
                     });
                   },
                 ),
@@ -258,7 +261,20 @@ class _HomeState extends State<Home> {
 
   @override
   Widget build(BuildContext context) {
+    // 1. Cập nhật trang Account (vì nó chứa logic đăng nhập/xuất)
     _pages[4] = _accountPage();
+
+    Widget currentPage = _pages[_selectedIndex];
+
+    // 2. 🌟 Xử lý logic hiển thị Tab Chat (index 3) dựa trên isLoggedIn
+    if (_selectedIndex == 3 && !isLoggedIn) {
+      currentPage = const Center(child: Text('Vui lòng đăng nhập để chat'));
+    } else if (_selectedIndex == 3 && isLoggedIn) {
+      currentPage = const ConversationListPage();
+    } else {
+      // Giữ nguyên các trang khác
+      currentPage = _pages[_selectedIndex];
+    }
 
     return Scaffold(
       appBar: _selectedIndex == 4
@@ -299,7 +315,7 @@ class _HomeState extends State<Home> {
           ),
         ],
       ),
-      body: _pages[_selectedIndex],
+      body: currentPage,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
