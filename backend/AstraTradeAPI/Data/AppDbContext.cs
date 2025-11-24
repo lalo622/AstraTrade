@@ -17,7 +17,6 @@ namespace AstraTradeAPI.Data
         public DbSet<Payment> Payments { get; set; }
         public DbSet<Chat> Chats { get; set; }
 
-        public DbSet<Favorite> Favorites { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             
