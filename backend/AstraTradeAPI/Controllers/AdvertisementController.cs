@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using AstraTradeAPI.Models;
 using AstraTradeAPI.Data;
+using AstraTradeAPI.Service;
 
 namespace AstraTradeAPI.Controllers
 {
@@ -10,13 +11,15 @@ namespace AstraTradeAPI.Controllers
     public class AdvertisementController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly LocationService _locationService;
 
-        public AdvertisementController(AppDbContext context)
+        public AdvertisementController(AppDbContext context, LocationService locationService)
         {
             _context = context;
+            _locationService = locationService;
         }
 
-        // THAY ĐỔI: Chỉ lấy tin đã được duyệt (Approved)
+        // Chỉ lấy tin đã được duyệt (Approved)
         [HttpGet("all")]
         public async Task<IActionResult> GetAllAds()
         {
@@ -38,6 +41,26 @@ namespace AstraTradeAPI.Controllers
             return Ok(ads);
         }
 
+        [HttpGet("test-geocode")]
+        public async Task<IActionResult> TestGeocode([FromQuery] string address)
+        {
+            var (lat, lng, displayName) = await _locationService.GeocodeAddress(address);
+
+            if (!lat.HasValue || !lng.HasValue)
+            {
+                return NotFound(new { message = "Không tìm thấy địa điểm" });
+            }
+
+            return Ok(new
+            {
+                inputAddress = address,
+                latitude = lat.Value,
+                longitude = lng.Value,
+                fullAddress = displayName,
+                message = "Geocoding thành công!"
+            });
+        }
+
         // 1. Lấy danh sách danh mục
         [HttpGet("categories")]
         public async Task<IActionResult> GetCategories()
@@ -48,7 +71,89 @@ namespace AstraTradeAPI.Controllers
             return Ok(categories);
         }
 
-        // THÊM API ẨN/HIỆN BÀI VIẾT (Toggle IsHidden)
+        // API: Lấy danh sách Quận/Huyện TP.HCM
+        [HttpGet("districts")]
+        public async Task<IActionResult> GetDistricts()
+        {
+            try
+            {
+                var districts = await _locationService.GetDistrictsInHCM();
+
+                if (districts == null || districts.Count == 0)
+                {
+                    return Ok(new
+                    {
+                        success = false,
+                        message = "Không lấy được danh sách quận/huyện",
+                        districts = new List<object>()
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    total = districts.Count,
+                    districts = districts.Select(d => new { d.Name, d.DisplayName })
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Lỗi khi lấy danh sách quận/huyện",
+                    error = ex.Message
+                });
+            }
+        }
+
+        // API: Lấy danh sách Phường/Xã theo Quận
+        [HttpGet("wards")]
+        public async Task<IActionResult> GetWards([FromQuery] string district)
+        {
+            if (string.IsNullOrEmpty(district))
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Vui lòng cung cấp tên quận/huyện"
+                });
+            }
+
+            try
+            {
+                var wards = await _locationService.GetWardsByDistrict(district);
+
+                if (wards == null || wards.Count == 0)
+                {
+                    return Ok(new
+                    {
+                        success = false,
+                        message = $"Không tìm thấy phường/xã trong {district}",
+                        wards = new List<object>()
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    district = district,
+                    total = wards.Count,
+                    wards = wards.Select(w => new { w.Name, w.DisplayName })
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Lỗi khi lấy danh sách phường/xã",
+                    error = ex.Message
+                });
+            }
+        }
+
+        // API ẨN/HIỆN BÀI VIẾT 
         [HttpPatch("toggle-visibility/{id}")]
         public async Task<IActionResult> ToggleVisibility(int id)
         {
@@ -66,10 +171,11 @@ namespace AstraTradeAPI.Controllers
             });
         }
 
-        // THAY ĐỔI: Khi đăng tin mới -> Status = "Pending" (Chờ duyệt)
+        //  API Đăng tin với 
         [HttpPost("post-ad")]
         public async Task<IActionResult> PostAd([FromBody] PostAdRequest req)
         {
+            // Validation cơ bản
             if (string.IsNullOrWhiteSpace(req.Title))
                 return BadRequest(new { message = "Tiêu đề không được để trống" });
 
@@ -80,27 +186,74 @@ namespace AstraTradeAPI.Controllers
             if (!userExists)
                 return BadRequest(new { message = "User không tồn tại" });
 
-            var ad = new Advertisement
-            {
-                Title = req.Title,
-                Description = req.Description,
-                Price = req.Price,
-                AdType = req.AdType,
-                Image = req.Image,
-                UserID = req.UserID.Value,
-                CategoryID = req.CategoryID,
-                Status = "Pending"
-            };
+            // Validation location 
+            if (string.IsNullOrWhiteSpace(req.District))
+                return BadRequest(new { message = "Vui lòng chọn Quận/Huyện" });
 
-            _context.Advertisements.Add(ad);
-            await _context.SaveChangesAsync();
+            if (string.IsNullOrWhiteSpace(req.Ward))
+                return BadRequest(new { message = "Vui lòng chọn Phường/Xã" });
 
-            return Ok(new
+            if (string.IsNullOrWhiteSpace(req.AddressDetail))
+                return BadRequest(new { message = "Vui lòng nhập địa chỉ cụ thể (số nhà, tên đường)" });
+
+            try
             {
-                message = "Đăng tin thành công. Tin của bạn đang chờ được duyệt.",
-                adId = ad.AdvertisementID,
-                status = "Pending"
-            });
+                var fullAddress = $"{req.AddressDetail}, {req.Ward}, {req.District}";
+
+                var (lat, lng, displayName) = await _locationService.GeocodeFullAddress(
+                    req.AddressDetail, req.Ward, req.District);
+
+                // Tạo Advertisement mới
+                var ad = new Advertisement
+                {
+                    Title = req.Title,
+                    Description = req.Description,
+                    Price = req.Price,
+                    AdType = req.AdType,
+                    Image = req.Image,
+                    UserID = req.UserID.Value,
+                    CategoryID = req.CategoryID,
+                    Status = "Pending",
+                    District = req.District,
+                    Ward = req.Ward,
+                    LocationAddress = fullAddress,  
+                    LocationName = displayName,     
+                    Latitude = lat,
+                    Longitude = lng
+                };
+
+                _context.Advertisements.Add(ad);
+                await _context.SaveChangesAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Đăng tin thành công. Tin của bạn đang chờ được duyệt.",
+                    adId = ad.AdvertisementID,
+                    status = "Pending",
+                    location = new
+                    {
+                        district = req.District,
+                        ward = req.Ward,
+                        addressDetail = req.AddressDetail,
+                        fullAddress = fullAddress,
+                        locationName = displayName,
+                        hasCoordinates = lat.HasValue && lng.HasValue,
+                        coordinates = lat.HasValue && lng.HasValue
+                            ? new { lat = lat.Value, lng = lng.Value }
+                            : null
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Lỗi khi đăng tin",
+                    error = ex.Message
+                });
+            }
         }
 
         [HttpGet("user-ads-byid")]
@@ -156,13 +309,12 @@ namespace AstraTradeAPI.Controllers
         public async Task<IActionResult> GetAdById(int id)
         {
             var ad = await _context.Advertisements
-                .Include(a => a.User)  
+                .Include(a => a.User)
                 .Include(a => a.Category)
                 .FirstOrDefaultAsync(a => a.AdvertisementID == id && a.Status != "Deleted");
 
             if (ad == null) return NotFound(new { message = "Không tìm thấy tin" });
 
-            // Query tên admin duyệt riêng
             string? moderatedByUserName = null;
             if (ad.ModeratedByUserID.HasValue)
             {
@@ -231,7 +383,6 @@ namespace AstraTradeAPI.Controllers
             }
         }
 
-        // API UPLOAD NHIỀU ẢNH
         [HttpPost("upload-multiple-images")]
         public async Task<IActionResult> UploadMultipleImages(List<IFormFile> files)
         {
@@ -276,7 +427,6 @@ namespace AstraTradeAPI.Controllers
             });
         }
 
-        // THAY ĐỔI: Khi cập nhật tin -> Status về "Pending" để duyệt 
         [HttpPost("update-ad/{id}")]
         public async Task<IActionResult> UpdateAd(int id, [FromBody] PostAdRequest req)
         {
@@ -284,7 +434,6 @@ namespace AstraTradeAPI.Controllers
             if (ad == null)
                 return NotFound(new { message = "Không tìm thấy tin để cập nhật" });
 
-            // Kiểm tra nếu tin đang Rejected hoặc Approved, khi sửa sẽ về Pending
             var needReview = ad.Status == "Approved" || ad.Status == "Rejected";
 
             ad.Title = req.Title ?? ad.Title;
@@ -293,6 +442,21 @@ namespace AstraTradeAPI.Controllers
             ad.AdType = req.AdType ?? ad.AdType;
             ad.CategoryID = req.CategoryID ?? ad.CategoryID;
             ad.Image = req.Image ?? ad.Image;
+
+            // Cập nhật location nếu có thay đổi
+            if (!string.IsNullOrEmpty(req.District) && !string.IsNullOrEmpty(req.Ward) && !string.IsNullOrEmpty(req.AddressDetail))
+            {
+                ad.District = req.District;
+                ad.Ward = req.Ward;
+                var fullAddress = $"{req.AddressDetail}, {req.Ward}, {req.District}";
+                ad.LocationAddress = fullAddress;
+
+                var (lat, lng, displayName) = await _locationService.GeocodeFullAddress(
+                    req.AddressDetail, req.Ward, req.District);
+                ad.Latitude = lat;
+                ad.Longitude = lng;
+                ad.LocationName = displayName;
+            }
 
             if (needReview)
             {
@@ -328,7 +492,7 @@ namespace AstraTradeAPI.Controllers
             return Ok(new { message = "Xóa tin thành công" });
         }
 
-            [HttpGet("filter")]
+        [HttpGet("filter")]
         public async Task<IActionResult> FilterAds(
             int page = 1,
             int pageSize = 10,
@@ -381,7 +545,86 @@ namespace AstraTradeAPI.Controllers
             });
         }
 
-        // Request body model
+        [HttpGet("nearby")]
+        public async Task<IActionResult> GetNearbyAds(
+            [FromQuery] double userLat,
+            [FromQuery] double userLng,
+            [FromQuery] double radiusKm = 10,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
+        {
+            try
+            {
+                var allAds = await _context.Advertisements
+                    .Where(a => a.Latitude.HasValue &&
+                               a.Longitude.HasValue &&
+                               a.Status == "Approved" &&
+                               !a.IsHidden)
+                    .Include(a => a.User)
+                    .Include(a => a.Category)
+                    .ToListAsync();
+
+                var nearbyAds = allAds
+                    .Select(a => new
+                    {
+                        ad = a,
+                        distance = _locationService.CalculateDistance(
+                            userLat, userLng,
+                            a.Latitude.Value, a.Longitude.Value
+                        )
+                    })
+                    .Where(x => x.distance <= radiusKm)
+                    .OrderBy(x => x.distance)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .Select(x => new
+                    {
+                        x.ad.AdvertisementID,
+                        x.ad.Title,
+                        x.ad.Description,
+                        x.ad.Price,
+                        x.ad.Image,
+                        x.ad.AdType,
+                        x.ad.LocationAddress,
+                        x.ad.LocationName,
+                        x.ad.PostDate,
+                        distance = Math.Round(x.distance, 2),
+                        distanceText = x.distance < 1
+                            ? $"{Math.Round(x.distance * 1000)}m"
+                            : $"{Math.Round(x.distance, 1)}km",
+                        category = x.ad.Category != null ? new
+                        {
+                            x.ad.Category.CategoryID,
+                            x.ad.Category.Name
+                        } : null,
+                        user = x.ad.User != null ? new
+                        {
+                            x.ad.User.UserID,
+                            x.ad.User.Username
+                        } : null
+                    })
+                    .ToList();
+
+                return Ok(new
+                {
+                    success = true,
+                    total = nearbyAds.Count,
+                    radiusKm,
+                    userLocation = new { lat = userLat, lng = userLng },
+                    ads = nearbyAds
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Lỗi khi lấy bài đăng gần bạn",
+                    error = ex.Message
+                });
+            }
+        }
+
         public class PostAdRequest
         {
             public string? Title { get; set; }
@@ -391,6 +634,9 @@ namespace AstraTradeAPI.Controllers
             public string? Image { get; set; }
             public int? UserID { get; set; }
             public int? CategoryID { get; set; }
+            public string? District { get; set; }      // Quận/Huyện
+            public string? Ward { get; set; }          // Phường/Xã  
+            public string? AddressDetail { get; set; } // Địa chỉ cụ thể 
         }
     }
 }

@@ -23,13 +23,28 @@ namespace AstraTradeAPI.Models
         [MaxLength(255)]
         public string? Address { get; set; }
 
+        [MaxLength(100)]
+        public string? Ward { get; set; }
+
+        [MaxLength(100)]
+        public string? District { get; set; }
+
         [Required]
-        public string Role { get; set; } = "Member"; // Admin / Member
+        public string Role { get; set; } = "Member";
 
         public bool IsVIP { get; set; } = false;
         public bool IsActivated { get; set; } = true;
 
-        // 🔹 Navigation
+        [Column(TypeName = "decimal(10, 8)")]
+        public double? CurrentLatitude { get; set; }
+
+        [Column(TypeName = "decimal(11, 8)")]
+        public double? CurrentLongitude { get; set; }
+
+        [MaxLength(255)]
+        public string? CurrentLocation { get; set; }
+
+        // Navigation
         public ICollection<Advertisement>? Advertisements { get; set; }
         public ICollection<Feedback>? Feedbacks { get; set; }
         public ICollection<Report>? Reports { get; set; }
