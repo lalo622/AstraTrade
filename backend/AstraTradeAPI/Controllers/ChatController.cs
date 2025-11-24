@@ -2,23 +2,28 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Google.Cloud.Firestore;
 using AstraTradeAPI.Data;
 using AstraTradeAPI.Models;
+using AstraTradeAPI.Models.Firebase;
 using AstraTradeAPI.Hubs;
+using AstraTradeAPI.Services;
 
 namespace AstraTradeAPI.Controllers
 {
-    [Route("api/[controller]")]  
+    [Route("api/[controller]")]
     [ApiController]
-    public class ChatController : ControllerBase  
+    public class ChatController : ControllerBase
     {
         private readonly AppDbContext _context;
         private readonly IHubContext<ChatHub> _hubContext;
+        private readonly FirestoreDb _firestore;
 
         public ChatController(AppDbContext context, IHubContext<ChatHub> hubContext)
         {
             _context = context;
             _hubContext = hubContext;
+            _firestore = FirebaseService.GetFirestoreDb();
         }
 
         // POST: api/Chat/send
@@ -28,29 +33,53 @@ namespace AstraTradeAPI.Controllers
         {
             try
             {
-                var chat = new Chat
+                var sender = await _context.Users.FindAsync(dto.SenderID);
+                if (sender == null)
+                    return NotFound(new { message = "Không tìm thấy người gửi" });
+
+                var firebaseMessage = new FirebaseMessage
                 {
-                    SenderID = dto.SenderID,
-                    ReceiverID = dto.ReceiverID,
+                    MessageId = Guid.NewGuid().ToString(),
+                    SenderId = dto.SenderID,
+                    ReceiverId = dto.ReceiverID,
                     Message = dto.Message ?? "",
-                    DateTime = DateTime.Now,
-                    ImageUrl = dto.ImageUrl
+                    ImageUrl = dto.ImageUrl,
+                    Timestamp = Timestamp.GetCurrentTimestamp(),
+                    SenderUsername = sender.Username ?? "Unknown"
                 };
 
-                _context.Chats.Add(chat);
-                await _context.SaveChangesAsync();
+                var conversationId = GenerateConversationId(dto.SenderID, dto.ReceiverID);
 
-                var sender = await _context.Users.FindAsync(dto.SenderID);
+                // Lưu message vào Firebase
+                var messagesRef = _firestore.Collection("conversations")
+                    .Document(conversationId)
+                    .Collection("messages");
 
+                await messagesRef.Document(firebaseMessage.MessageId).SetAsync(firebaseMessage);
+
+                // Cập nhật conversation metadata
+                var conversationRef = _firestore.Collection("conversations").Document(conversationId);
+                var conversationData = new Dictionary<string, object>
+                {
+                    { "conversationId", conversationId },
+                    { "participants", new List<int> { dto.SenderID, dto.ReceiverID } },
+                    { "lastMessage", dto.Message ?? "Hình ảnh" },
+                    { "lastMessageTime", Timestamp.GetCurrentTimestamp() },
+                    { "lastSenderId", dto.SenderID }
+                };
+
+                await conversationRef.SetAsync(conversationData, SetOptions.MergeAll);
+
+                // Gửi qua SignalR với format giống cũ để React nhận được
                 var messageResponse = new
                 {
-                    chatID = chat.ChatID,
-                    senderID = chat.SenderID,
-                    receiverID = chat.ReceiverID,
-                    message = chat.Message,
-                    dateTime = chat.DateTime,
-                    senderUsername = sender?.Username ?? "Unknown",
-                    imageUrl = chat.ImageUrl
+                    chatID = firebaseMessage.MessageId,  // Dùng chatID thay vì messageId
+                    senderID = firebaseMessage.SenderId,
+                    receiverID = firebaseMessage.ReceiverId,
+                    message = firebaseMessage.Message,
+                    dateTime = firebaseMessage.Timestamp.ToDateTime(),
+                    senderUsername = firebaseMessage.SenderUsername,
+                    imageUrl = firebaseMessage.ImageUrl
                 };
 
                 await _hubContext.Clients.All.SendAsync("ReceiveMessage", messageResponse);
@@ -61,11 +90,11 @@ namespace AstraTradeAPI.Controllers
             {
                 Console.WriteLine($"Error in SendMessage: {ex.Message}");
                 Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-                
-                return StatusCode(500, new { 
-                    message = "Lỗi khi gửi tin nhắn", 
-                    error = ex.Message,
-                    innerError = ex.InnerException?.Message
+
+                return StatusCode(500, new
+                {
+                    message = "Lỗi khi gửi tin nhắn",
+                    error = ex.Message
                 });
             }
         }
@@ -77,51 +106,39 @@ namespace AstraTradeAPI.Controllers
         {
             try
             {
-                var conversations = await _context.Chats
-                    .Where(c => c.SenderID == userId || c.ReceiverID == userId)
-                    .OrderByDescending(c => c.DateTime)
-                    .Select(c => new
-                    {
-                        c.SenderID,
-                        c.ReceiverID,
-                        c.Message,
-                        c.DateTime
-                    })
-                    .ToListAsync();
+                var conversationsRef = _firestore.Collection("conversations");
+                var query = conversationsRef.WhereArrayContains("participants", userId);
+                var snapshot = await query.GetSnapshotAsync();
 
-                var groupedConversations = conversations
-                    .GroupBy(c => c.SenderID == userId ? c.ReceiverID : c.SenderID)
-                    .Select(g => new
+                var conversations = new List<object>();
+
+                foreach (var doc in snapshot.Documents)
+                {
+                    var data = doc.ToDictionary();
+                    var participants = ((List<object>)data["participants"]).Cast<long>().Select(x => (int)x).ToList();
+                    var otherUserId = participants.First(id => id != userId);
+
+                    var otherUser = await _context.Users.FindAsync(otherUserId);
+
+                    conversations.Add(new
                     {
-                        userId = g.Key,
-                        lastMessage = g.First().Message,
-                        lastMessageTime = g.First().DateTime
-                    })
+                        userId = otherUserId,
+                        username = otherUser?.Username ?? "Unknown",
+                        email = otherUser?.Email,
+                        lastMessage = data["lastMessage"].ToString(),
+                        lastMessageTime = ((Timestamp)data["lastMessageTime"]).ToDateTime()
+                    });
+                }
+
+                var sortedConversations = conversations
+                    .OrderByDescending(c => ((dynamic)c).lastMessageTime)
                     .ToList();
 
-                var userIds = groupedConversations.Select(c => c.userId).ToList();
-                var users = await _context.Users
-                    .Where(u => userIds.Contains(u.UserID))
-                    .Select(u => new { u.UserID, u.Username, u.Email })
-                    .ToListAsync();
-
-                var result = groupedConversations.Select(c =>
-                {
-                    var user = users.FirstOrDefault(u => u.UserID == c.userId);
-                    return new
-                    {
-                        userId = c.userId,
-                        username = user?.Username ?? "Unknown",
-                        email = user?.Email,
-                        lastMessage = c.lastMessage,
-                        lastMessageTime = c.lastMessageTime
-                    };
-                }).ToList();
-
-                return Ok(result);
+                return Ok(sortedConversations);
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Error in GetConversations: {ex.Message}");
                 return StatusCode(500, new { message = "Lỗi khi lấy danh sách hội thoại", error = ex.Message });
             }
         }
@@ -133,28 +150,35 @@ namespace AstraTradeAPI.Controllers
         {
             try
             {
-                var messages = await _context.Chats
-                    .Include(c => c.Sender)
-                    .Where(c =>
-                        (c.SenderID == currentUserId && c.ReceiverID == otherUserId) ||
-                        (c.SenderID == otherUserId && c.ReceiverID == currentUserId))
-                    .OrderBy(c => c.DateTime)
-                    .Select(c => new
+                var conversationId = GenerateConversationId(currentUserId, otherUserId);
+
+                var messagesRef = _firestore.Collection("conversations")
+                    .Document(conversationId)
+                    .Collection("messages")
+                    .OrderBy("timestamp");
+
+                var snapshot = await messagesRef.GetSnapshotAsync();
+
+                var messages = snapshot.Documents.Select(doc =>
+                {
+                    var data = doc.ToDictionary();
+                    return new
                     {
-                        c.ChatID,
-                        c.SenderID,
-                        c.ReceiverID,
-                        c.Message,
-                        c.DateTime,
-                        c.ImageUrl,
-                        senderUsername = c.Sender != null ? c.Sender.Username : "Unknown"
-                    })
-                    .ToListAsync();
+                        chatID = data["messageId"].ToString(),
+                        senderID = Convert.ToInt32(data["senderId"]),
+                        receiverID = Convert.ToInt32(data["receiverId"]),
+                        message = data["message"].ToString(),
+                        dateTime = ((Timestamp)data["timestamp"]).ToDateTime(),
+                        imageUrl = data.ContainsKey("imageUrl") ? data["imageUrl"]?.ToString() : null,
+                        senderUsername = data["senderUsername"].ToString()
+                    };
+                }).ToList();
 
                 return Ok(messages);
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"Error in GetMessages: {ex.Message}");
                 return StatusCode(500, new { message = "Lỗi khi lấy tin nhắn", error = ex.Message });
             }
         }
@@ -194,7 +218,7 @@ namespace AstraTradeAPI.Controllers
 
                 var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
                 var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-                
+
                 if (!allowedExtensions.Contains(extension))
                     return BadRequest(new { message = "Chỉ chấp nhận file ảnh (jpg, jpeg, png, gif, webp)" });
 
@@ -214,7 +238,7 @@ namespace AstraTradeAPI.Controllers
                 }
 
                 var url = $"{Request.Scheme}://{Request.Host}/chat-images/{fileName}";
-                
+
                 return Ok(new { imageUrl = url });
             }
             catch (Exception ex)
@@ -222,13 +246,19 @@ namespace AstraTradeAPI.Controllers
                 return StatusCode(500, new { message = "Lỗi upload file", error = ex.Message });
             }
         }
+
+        private string GenerateConversationId(int userId1, int userId2)
+        {
+            var ids = new[] { userId1, userId2 }.OrderBy(id => id).ToArray();
+            return $"{ids[0]}_{ids[1]}";
+        }
     }
 
     public class SendMessageDto
     {
         public int SenderID { get; set; }
         public int ReceiverID { get; set; }
-        public string Message { get; set; }
-        public string ImageUrl { get; set; }
+        public string Message { get; set; } = "";
+        public string? ImageUrl { get; set; }
     }
 }
