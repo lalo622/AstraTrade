@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AstraTradeAPI.Service
 {
@@ -6,6 +7,7 @@ namespace AstraTradeAPI.Service
     {
         private readonly HttpClient _httpClient;
         private const string NOMINATIM_URL = "https://nominatim.openstreetmap.org";
+        private const string VN_API_URL = "https://provinces.open-api.vn/api";
 
         public LocationService(HttpClient httpClient)
         {
@@ -13,92 +15,179 @@ namespace AstraTradeAPI.Service
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "AstraTradeAPI/1.0");
         }
 
-        // Lấy danh sách Quận/Huyện của TP.HCM
+        // Lấy danh sách Quận/Huyện TP.HCM từ API Việt Nam
         public async Task<List<DistrictInfo>> GetDistrictsInHCM()
         {
             try
             {
-                var url = $"{NOMINATIM_URL}/search?city=Ho Chi Minh City&country=Vietnam&format=json&addressdetails=1&limit=50";
+                // Code 79 = TP. Hồ Chí Minh
+                var url = $"{VN_API_URL}/p/79?depth=2";
                 var response = await _httpClient.GetAsync(url);
 
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync();
-                    var results = JsonSerializer.Deserialize<List<NominatimDetailResult>>(json);
+                    var result = JsonSerializer.Deserialize<VNProvinceResult>(json);
 
-                    // Extract unique districts
-                    var districts = results?
-                        .Where(r => r.address?.suburb != null || r.address?.county != null)
-                        .Select(r => new DistrictInfo
+                    if (result?.districts != null && result.districts.Any())
+                    {
+                        var districts = result.districts.Select(d => new DistrictInfo
                         {
-                            Name = r.address?.suburb ?? r.address?.county ?? "Unknown",
-                            DisplayName = r.display_name
-                        })
-                        .GroupBy(d => d.Name)
-                        .Select(g => g.First())
-                        .OrderBy(d => d.Name)
-                        .ToList();
+                            Name = d.name,
+                            DisplayName = d.name,
+                            Code = d.code.ToString()
+                        }).OrderBy(d => d.Name).ToList();
 
-                    return districts ?? new List<DistrictInfo>();
+                        Console.WriteLine($"Loaded {districts.Count} districts from API");
+                        return districts;
+                    }
                 }
 
-                return new List<DistrictInfo>();
+                Console.WriteLine("API failed, using fallback");
+                return GetHardcodedDistricts();
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Get districts error: {ex.Message}");
-                return new List<DistrictInfo>();
+                return GetHardcodedDistricts();
             }
         }
 
-        // Lấy danh sách Phường/Xã theo Quận
+        // Lấy danh sách Phường/Xã theo Quận từ API Việt Nam
         public async Task<List<WardInfo>> GetWardsByDistrict(string districtName)
         {
             try
             {
-                var searchQuery = $"{districtName}, Ho Chi Minh City, Vietnam";
-                var url = $"{NOMINATIM_URL}/search?q={Uri.EscapeDataString(searchQuery)}&format=json&addressdetails=1&limit=50";
+                // Bước 1: Tìm code của district
+                var districts = await GetDistrictsInHCM();
+                var district = districts.FirstOrDefault(d => d.Name == districtName);
+
+                if (district == null || string.IsNullOrEmpty(district.Code))
+                {
+                    Console.WriteLine($"District code not found for: {districtName}");
+                    return GetDefaultWards(districtName);
+                }
+
+                // Bước 2: Lấy wards theo district code
+                var url = $"{VN_API_URL}/d/{district.Code}?depth=2";
                 var response = await _httpClient.GetAsync(url);
 
                 if (response.IsSuccessStatusCode)
                 {
                     var json = await response.Content.ReadAsStringAsync();
-                    var results = JsonSerializer.Deserialize<List<NominatimDetailResult>>(json);
+                    var result = JsonSerializer.Deserialize<VNDistrictResult>(json);
 
-                    // Extract unique wards
-                    var wards = results?
-                        .Where(r => r.address?.neighbourhood != null || r.address?.suburb != null)
-                        .Select(r => new WardInfo
+                    if (result?.wards != null && result.wards.Any())
+                    {
+                        var wards = result.wards.Select(w => new WardInfo
                         {
-                            Name = r.address?.neighbourhood ?? r.address?.suburb ?? "Unknown",
-                            DisplayName = r.display_name
-                        })
-                        .GroupBy(w => w.Name)
-                        .Select(g => g.First())
-                        .OrderBy(w => w.Name)
-                        .ToList();
+                            Name = w.name,
+                            DisplayName = w.name,
+                            Code = w.code.ToString()
+                        }).OrderBy(w => w.Name).ToList();
 
-                    return wards ?? new List<WardInfo>();
+                        Console.WriteLine($"Loaded {wards.Count} wards for {districtName}");
+                        return wards;
+                    }
                 }
 
-                return new List<WardInfo>();
+                Console.WriteLine($"API failed for wards, using fallback");
+                return GetDefaultWards(districtName);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Get wards error: {ex.Message}");
-                return new List<WardInfo>();
+                return GetDefaultWards(districtName);
             }
         }
 
-        // Geocode địa chỉ đầy đủ (AddressDetail + Ward + District + HCM)
+        // Fallback: Hardcoded districts
+        private List<DistrictInfo> GetHardcodedDistricts()
+        {
+            var districts = new List<DistrictInfo>
+            {
+                new DistrictInfo { Name = "Quận 1", DisplayName = "Quận 1", Code = "760" },
+                new DistrictInfo { Name = "Quận 2", DisplayName = "Quận 2", Code = "769" },
+                new DistrictInfo { Name = "Quận 3", DisplayName = "Quận 3", Code = "770" },
+                new DistrictInfo { Name = "Quận 4", DisplayName = "Quận 4", Code = "771" },
+                new DistrictInfo { Name = "Quận 5", DisplayName = "Quận 5", Code = "772" },
+                new DistrictInfo { Name = "Quận 6", DisplayName = "Quận 6", Code = "773" },
+                new DistrictInfo { Name = "Quận 7", DisplayName = "Quận 7", Code = "774" },
+                new DistrictInfo { Name = "Quận 8", DisplayName = "Quận 8", Code = "775" },
+                new DistrictInfo { Name = "Quận 10", DisplayName = "Quận 10", Code = "778" },
+                new DistrictInfo { Name = "Quận 11", DisplayName = "Quận 11", Code = "776" },
+                new DistrictInfo { Name = "Quận 12", DisplayName = "Quận 12", Code = "777" },
+                new DistrictInfo { Name = "Quận Gò Vấp", DisplayName = "Quận Gò Vấp", Code = "764" },
+                new DistrictInfo { Name = "Quận Bình Thạnh", DisplayName = "Quận Bình Thạnh", Code = "765" },
+                new DistrictInfo { Name = "Quận Tân Bình", DisplayName = "Quận Tân Bình", Code = "766" },
+                new DistrictInfo { Name = "Quận Tân Phú", DisplayName = "Quận Tân Phú", Code = "767" },
+                new DistrictInfo { Name = "Quận Phú Nhuận", DisplayName = "Quận Phú Nhuận", Code = "768" },
+                new DistrictInfo { Name = "Quận Bình Tân", DisplayName = "Quận Bình Tân", Code = "761" },
+                new DistrictInfo { Name = "Thành phố Thủ Đức", DisplayName = "Thành phố Thủ Đức", Code = "769" },
+                new DistrictInfo { Name = "Huyện Củ Chi", DisplayName = "Huyện Củ Chi", Code = "783" },
+                new DistrictInfo { Name = "Huyện Hóc Môn", DisplayName = "Huyện Hóc Môn", Code = "784" },
+                new DistrictInfo { Name = "Huyện Bình Chánh", DisplayName = "Huyện Bình Chánh", Code = "785" },
+                new DistrictInfo { Name = "Huyện Nhà Bè", DisplayName = "Huyện Nhà Bè", Code = "786" },
+                new DistrictInfo { Name = "Huyện Cần Giờ", DisplayName = "Huyện Cần Giờ", Code = "787" }
+            };
+
+            return districts;
+        }
+
+        // Fallback wards
+        private List<WardInfo> GetDefaultWards(string district)
+        {
+            var defaultWards = new Dictionary<string, List<string>>
+            {
+                ["Quận 1"] = new List<string>
+                {
+                    "Phường Bến Nghé", "Phường Bến Thành", "Phường Cầu Kho",
+                    "Phường Cầu Ông Lãnh", "Phường Cô Giang", "Phường Đa Kao",
+                    "Phường Nguyễn Cư Trinh", "Phường Nguyễn Thái Bình",
+                    "Phường Phạm Ngũ Lão", "Phường Tân Định"
+                },
+                ["Quận 3"] = new List<string>
+                {
+                    "Phường 01", "Phường 02", "Phường 03", "Phường 04",
+                    "Phường 05", "Phường 06", "Phường 07", "Phường 08",
+                    "Phường 09", "Phường 10", "Phường 11", "Phường 12",
+                    "Phường 13", "Phường 14"
+                },
+                ["Quận 5"] = new List<string>
+                {
+                    "Phường 01", "Phường 02", "Phường 03", "Phường 04",
+                    "Phường 05", "Phường 06", "Phường 07", "Phường 08",
+                    "Phường 09", "Phường 10", "Phường 11", "Phường 12",
+                    "Phường 13", "Phường 14", "Phường 15"
+                }
+            };
+
+            if (defaultWards.ContainsKey(district))
+            {
+                return defaultWards[district].Select(w => new WardInfo
+                {
+                    Name = w,
+                    DisplayName = w
+                }).ToList();
+            }
+
+            // Generic fallback
+            return Enumerable.Range(1, 10)
+                .Select(i => new WardInfo
+                {
+                    Name = $"Phường {i:D2}",
+                    DisplayName = $"Phường {i:D2}"
+                }).ToList();
+        }
+
+        // Geocode địa chỉ đầy đủ
         public async Task<(double? lat, double? lng, string displayName)> GeocodeFullAddress(
             string addressDetail, string ward, string district)
         {
             try
             {
-                // Format: "400K Nguyễn Tri Phương, Phường 10, Quận 1, Ho Chi Minh City, Vietnam"
                 var fullAddress = $"{addressDetail}, {ward}, {district}, Ho Chi Minh City, Vietnam";
-                
+
                 var url = $"{NOMINATIM_URL}/search?q={Uri.EscapeDataString(fullAddress)}&format=json&limit=1";
                 var response = await _httpClient.GetAsync(url);
 
@@ -118,7 +207,7 @@ namespace AstraTradeAPI.Service
                     }
                 }
 
-                // Fallback: thử geocode chỉ với district nếu full address fail
+                // Fallback: geocode chỉ với district
                 return await GeocodeAddress($"{district}, Ho Chi Minh City, Vietnam");
             }
             catch (Exception ex)
@@ -128,7 +217,7 @@ namespace AstraTradeAPI.Service
             }
         }
 
-        // Chuyển địa chỉ thành tọa độ (Geocoding) - method cũ
+        // Geocode address
         public async Task<(double? lat, double? lng, string displayName)> GeocodeAddress(string address)
         {
             try
@@ -161,7 +250,7 @@ namespace AstraTradeAPI.Service
             }
         }
 
-        // Chuyển tọa độ thành địa chỉ (Reverse Geocoding)
+        // Reverse geocode
         public async Task<string> ReverseGeocode(double lat, double lng)
         {
             try
@@ -185,10 +274,10 @@ namespace AstraTradeAPI.Service
             }
         }
 
-        // Tính khoảng cách giữa 2 điểm (Haversine Formula)
+        // Calculate distance (Haversine)
         public double CalculateDistance(double lat1, double lng1, double lat2, double lng2)
         {
-            const double R = 6371; // Bán kính trái đất (km)
+            const double R = 6371;
 
             var dLat = ToRadians(lat2 - lat1);
             var dLng = ToRadians(lng2 - lng1);
@@ -199,7 +288,7 @@ namespace AstraTradeAPI.Service
 
             var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
 
-            return R * c; // Khoảng cách tính bằng km
+            return R * c;
         }
 
         private double ToRadians(double degrees)
@@ -207,7 +296,7 @@ namespace AstraTradeAPI.Service
             return degrees * Math.PI / 180;
         }
 
-        // Lấy vị trí hiện tại từ IP (backup nếu user không cho phép location)
+        // Get location from IP
         public async Task<(double? lat, double? lng, string location)> GetLocationFromIP(string ipAddress)
         {
             try
@@ -236,20 +325,65 @@ namespace AstraTradeAPI.Service
         }
     }
 
-    // Models cho Districts & Wards
+    // Models for VN API
+    public class VNProvinceResult
+    {
+        [JsonPropertyName("name")]
+        public string name { get; set; } = "";
+
+        [JsonPropertyName("code")]
+        public int code { get; set; }
+
+        [JsonPropertyName("districts")]
+        public List<VNDistrictData> districts { get; set; } = new();
+    }
+
+    public class VNDistrictData
+    {
+        [JsonPropertyName("name")]
+        public string name { get; set; } = "";
+
+        [JsonPropertyName("code")]
+        public int code { get; set; }
+    }
+
+    public class VNDistrictResult
+    {
+        [JsonPropertyName("name")]
+        public string name { get; set; } = "";
+
+        [JsonPropertyName("code")]
+        public int code { get; set; }
+
+        [JsonPropertyName("wards")]
+        public List<VNWardData> wards { get; set; } = new();
+    }
+
+    public class VNWardData
+    {
+        [JsonPropertyName("name")]
+        public string name { get; set; } = "";
+
+        [JsonPropertyName("code")]
+        public int code { get; set; }
+    }
+
+    // Models for Districts & Wards
     public class DistrictInfo
     {
         public string Name { get; set; } = "";
         public string DisplayName { get; set; } = "";
+        public string Code { get; set; } = "";
     }
 
     public class WardInfo
     {
         public string Name { get; set; } = "";
         public string DisplayName { get; set; } = "";
+        public string Code { get; set; } = "";
     }
 
-    // Models cho Nominatim
+    // Models for Nominatim
     public class NominatimResult
     {
         public string lat { get; set; } = "";
@@ -257,28 +391,12 @@ namespace AstraTradeAPI.Service
         public string display_name { get; set; } = "";
     }
 
-    public class NominatimDetailResult
-    {
-        public string lat { get; set; } = "";
-        public string lon { get; set; } = "";
-        public string display_name { get; set; } = "";
-        public NominatimAddress? address { get; set; }
-    }
-
-    public class NominatimAddress
-    {
-        public string? neighbourhood { get; set; }
-        public string? suburb { get; set; }
-        public string? county { get; set; }
-        public string? city { get; set; }
-    }
-
     public class NominatimReverseResult
     {
         public string display_name { get; set; } = "";
     }
 
-    // Model cho IP-API
+    // Model for IP-API
     public class IPApiResult
     {
         public string status { get; set; } = "";

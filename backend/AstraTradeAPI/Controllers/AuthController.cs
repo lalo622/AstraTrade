@@ -192,72 +192,108 @@ namespace AstraTradeAPI.Controllers
                     .Include(u => u.Payments)
                     .ThenInclude(p => p.Package)
                     .Where(u => u.UserID == userId)
-                    .FirstOrDefaultAsync(u => u.UserID == userId);
-                    
+                    .FirstOrDefaultAsync();
 
                 if (user == null)
                     return NotFound(new { message = "Không tìm thấy người dùng." });
-                    var lastPayment = user.Payments?
+
+                var lastPayment = user.Payments?
                     .Where(p => p.Status == "Success")
                     .OrderByDescending(p => p.Date)
                     .FirstOrDefault();
+
                 DateTime? expiryDate = null;
                 string packageName = null;
 
-        if (lastPayment != null && lastPayment.Package != null)
-        {
-            packageName = lastPayment.Package.Name;
-            expiryDate = lastPayment.Date.AddDays(lastPayment.Package.Duration);
+                if (lastPayment != null && lastPayment.Package != null)
+                {
+                    packageName = lastPayment.Package.Name;
+                    expiryDate = lastPayment.Date.AddDays(lastPayment.Package.Duration);
+                    user.IsVIP = expiryDate > DateTime.Now;
+                }
 
-            // cập nhật trạng thái VIP
-            user.IsVIP = expiryDate > DateTime.Now;
-        }
-
-        return Ok(new
-        {
-            user.UserID,
-            user.Username,
-            user.Email,
-            isVIP = user.IsVIP,
-            vipPackageName = packageName,
-            vipExpiryDate = expiryDate
-        });
-                
+                return Ok(new
+                {
+                    userId = user.UserID,
+                    username = user.Username,
+                    email = user.Email,
+                    phone = user.Phone,              
+                    address = user.Address,          
+                    district = user.District,        
+                    ward = user.Ward,                
+                    isVIP = user.IsVIP,
+                    vipPackageName = packageName,
+                    vipExpiryDate = expiryDate
+                });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Lỗi server: " + ex.Message });
             }
         }
+
         [HttpPost("create-admin")]
-public async Task<IActionResult> CreateAdmin()
-{
-    try
-    {
-        // Kiểm tra xem admin đã tồn tại chưa
-        if (await _context.Users.AnyAsync(u => u.Username == "giatien"))
+        public async Task<IActionResult> CreateAdmin()
         {
-            return BadRequest(new { message = "Admin user already exists" });
+            try
+            {
+                // Kiểm tra xem admin đã tồn tại chưa
+                if (await _context.Users.AnyAsync(u => u.Username == "giatien"))
+                {
+                    return BadRequest(new { message = "Admin user already exists" });
+                }
+
+                var adminUser = new User
+                {
+                    Username = "giatien",
+                    Password = BCrypt.Net.BCrypt.HashPassword("giatien123@"),
+                    Email = "giatien@admin.com",
+                    Role = "Admin"
+                };
+
+                _context.Users.Add(adminUser);
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "Admin user created successfully" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = $"Internal server error: {ex.Message}" });
+            }
+            
         }
-
-        var adminUser = new User
+        [HttpPut("{userId}/location")]
+        public async Task<IActionResult> UpdateLocation(int userId, [FromBody] UpdateLocationDto dto)
         {
-            Username = "giatien",
-            Password = BCrypt.Net.BCrypt.HashPassword("giatien123@"),
-            Email = "giatien@admin.com",
-            Role = "Admin"
-        };
+            try
+            {
+                var user = await _context.Users.FindAsync(userId);
+                if (user == null) 
+                    return NotFound(new { message = "Không tìm thấy người dùng" });
 
-        _context.Users.Add(adminUser);
-        await _context.SaveChangesAsync();
+                user.District = dto.District;
+                user.Ward = dto.Ward;
+                user.Address = dto.Address;
 
-        return Ok(new { message = "Admin user created successfully" });
-    }
-    catch (Exception ex)
-    {
-        return StatusCode(500, new { message = $"Internal server error: {ex.Message}" });
-    }
-}
+                await _context.SaveChangesAsync();
+
+                return Ok(new 
+                { 
+                    success = true,
+                    message = "Cập nhật địa chỉ thành công",
+                    data = new
+                    {
+                        district = user.District,
+                        ward = user.Ward,
+                        address = user.Address
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Lỗi: " + ex.Message });
+            }
+        }
 
 
         // ⚙️ Request models
@@ -284,6 +320,12 @@ public async Task<IActionResult> CreateAdmin()
             public string Email { get; set; } = string.Empty;
             public string Otp { get; set; } = string.Empty;
             public string NewPassword { get; set; } = string.Empty;
+        }
+        public class UpdateLocationDto
+        {
+            public string District { get; set; }
+            public string Ward { get; set; }
+            public string Address { get; set; }
         }
     }
 }
