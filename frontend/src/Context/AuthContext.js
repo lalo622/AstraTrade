@@ -18,13 +18,17 @@ export const AuthProvider = ({ children }) => {
     const token = localStorage.getItem('token');
     const userEmail = localStorage.getItem('userEmail');
     const username = localStorage.getItem('username');
-    const userId = localStorage.getItem('userId'); 
+    const userId = localStorage.getItem('userId');
+    const isVip = localStorage.getItem('isVip'); // ✅ THÊM DÒNG NÀY
+    const role = localStorage.getItem('role'); // ✅ THÊM DÒNG NÀY
     
     console.log('🔍 AuthContext - Loading from localStorage:', {
       token: token ? 'exists' : 'null',
       userEmail,
       username,
-      userId
+      userId,
+      isVip,
+      role
     });
     
     if (token && userEmail && userId) {
@@ -32,7 +36,9 @@ export const AuthProvider = ({ children }) => {
         id: parseInt(userId), 
         email: userEmail, 
         token,
-        username: username || userEmail.split('@')[0] 
+        username: username || userEmail.split('@')[0],
+        isVip: isVip === 'true', // ✅ THÊM DÒNG NÀY (convert string to boolean)
+        role: role || 'Member' // ✅ THÊM DÒNG NÀY
       };
       
       console.log('✅ User restored from localStorage:', userData);
@@ -59,7 +65,9 @@ export const AuthProvider = ({ children }) => {
       id: userId,
       email: userData.email,
       username: userData.username || userData.email.split('@')[0],
-      token: userData.token
+      token: userData.token,
+      isVip: userData.isVip || false, // ✅ THÊM DÒNG NÀY
+      role: userData.role || 'Member' // ✅ THÊM DÒNG NÀY
     };
     
     console.log("💾 Saving user data:", userWithId);
@@ -71,12 +79,16 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('userEmail', userData.email);
     localStorage.setItem('username', userWithId.username);
     localStorage.setItem('userId', userId.toString());
+    localStorage.setItem('isVip', userWithId.isVip.toString()); // ✅ THÊM DÒNG NÀY
+    localStorage.setItem('role', userWithId.role); // ✅ THÊM DÒNG NÀY
     
     console.log("✅ Saved to localStorage:", {
       token: localStorage.getItem('token') ? 'saved' : 'failed',
       userId: localStorage.getItem('userId'),
       userEmail: localStorage.getItem('userEmail'),
-      username: localStorage.getItem('username')
+      username: localStorage.getItem('username'),
+      isVip: localStorage.getItem('isVip'),
+      role: localStorage.getItem('role')
     });
   };
 
@@ -87,6 +99,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('userEmail');
     localStorage.removeItem('username');
     localStorage.removeItem('userId');
+    localStorage.removeItem('isVip'); // ✅ THÊM DÒNG NÀY
+    localStorage.removeItem('role'); // ✅ THÊM DÒNG NÀY
     console.log("✅ Logout complete, localStorage cleared");
   };
 

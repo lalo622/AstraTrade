@@ -9,6 +9,9 @@ const ProtectedRoute = ({ children }) => {
     // Chưa đăng nhập, chuyển hướng đến trang login
     return <Navigate to="/login" replace />;
   }
+   if (!user || user.role !== 'Admin') {
+    return <Navigate to="/" replace />;
+  }
   
   // Đã đăng nhập, hiển thị component
   return children;

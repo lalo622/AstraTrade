@@ -70,7 +70,19 @@ const userService = {
     } catch (error) {
       throw error.response?.data || error;
     }
-  }
+  },
+  updateUserLocation: async (userId, locationData) => {
+  const response = await axios.put(
+    `${API_BASE_URL}/auth/${userId}/location`,
+    locationData,
+    {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    }
+  );
+  return response.data;
+}
 };
 
 export default userService;

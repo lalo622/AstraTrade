@@ -1,7 +1,7 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import HomePage from "./Pages/HomePage";
-import AdminPage from "./Pages/AdminPage";
+import AdminDashboard from "./Pages/AdminPage";
 import Auth from "./Pages/Auth";
 import RegisterForm from "./Pages/Register";
 import LoginForm from "./Pages/Login";
@@ -28,6 +28,9 @@ import AdminModerationPage from './Component/Admin/AdModeration/AdminModerationP
 import AdminLayout from "./Component/Admin/AdminLayout";
 import ChatPage from "./Pages/ChatPage";
 import AdminReportList from "./Component/Report/AdminReportList";
+import NearbyPostsPage from "./Pages/NearbyPostPage";
+import AdminAdsManagement from "./Component/Admin/AdminAds/AdminAdsManagement";
+import ChatbotPage from "./Pages/ChatBotPage";
 
 function App() {
   return (
@@ -91,15 +94,48 @@ function App() {
               } 
               
             />
+            <Route 
+              path="/nearby" 
+              element={
+                <ProtectedRoute>
+                  <MainLayout><NearbyPostsPage /></MainLayout>
+                </ProtectedRoute>
+              } 
+              
+            />
+            <Route 
+              path="/chatbot" 
+              element={
+                <ProtectedRoute>
+                  <MainLayout><ChatbotPage /></MainLayout>
+                </ProtectedRoute>
+              } 
+              
+            />
 
             {/* === TRANG ADMIN - BỌC TRONG ADMINLAYOUT === */}
-            <Route path="/admin" element={<AdminPage />} />
+            <Route 
+              path="/admin/" 
+              element={
+                <ProtectedRoute>
+                  <AdminLayout><AdminDashboard /></AdminLayout>
+                </ProtectedRoute>
+              } 
+            />
             
             <Route 
               path="/admin/vip-packages" 
               element={
                 <ProtectedRoute>
                   <AdminLayout><AdminVipPackagePage /></AdminLayout>
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/ads" 
+              element={
+                <ProtectedRoute>
+                  <AdminLayout><AdminAdsManagement /></AdminLayout>
                 </ProtectedRoute>
               } 
             />
